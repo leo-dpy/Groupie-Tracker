@@ -9,22 +9,18 @@
 	</head>
 	<body>
 		<header>
-			<div class="header-inner">
+			<div class="contenu-entete">
 				<h1>Groupie-Tracker</h1>
-				<input id="search" type="search" placeholder="Rechercher un artiste…" />
+				<input id="recherche" type="search" placeholder="Rechercher un artiste…" />
 			</div>
 		</header>
 
 		<main>
-			<section class="grid" id="grid" aria-live="polite"></section>
+			<section class="grille" id="grille" aria-live="polite"></section>
 
-			<section id="detail" class="section">
-				<div id="detail-body"></div>
-			</section>
+			<div id="erreur" class="erreur" style="display:none"></div>
 
-			<div id="error" class="error" style="display:none"></div>
-
-			<div class="footer">Données: groupietrackers.herokuapp.com • Démo éducative</div>
+			<div class="pied-de-page">Données: groupietrackers.herokuapp.com • Démo éducative</div>
 		</main>
 
 		<script src="./app.js" defer></script>

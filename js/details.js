@@ -3,6 +3,7 @@ const BASE_API = (location.hostname === "localhost" || location.hostname === "12
   : "https://groupietrackers.herokuapp.com/api";
 
 let BASE = BASE_API;
+const YT_BASE = "/yt";
 
 const elts = {
   titre: document.getElementById("titre-artiste"),
@@ -118,7 +119,6 @@ async function chargerArtiste(id) {
 
     try {
       const idA = artiste.id;
-      // Utiliser systématiquement le proxy local pour éviter les problèmes de CORS
       const [locations, dates, relations] = await Promise.all([
         chargerJSON(`${BASE}/locations/${idA}`),
         chargerJSON(`${BASE}/dates/${idA}`),
@@ -171,7 +171,109 @@ async function chargerArtiste(id) {
       });
       relSection.appendChild(relList);
       elts.corpsDetails.appendChild(relSection);
-      // Masquer le debug une fois tout affiché
+
+      const ytSection = document.createElement("div");
+      ytSection.className = "bloc";
+      ytSection.innerHTML = `<h3>Vidéos YouTube</h3>`;
+      const ytWrap = document.createElement("div");
+      try {
+        let videos = [];
+        try {
+          const qChan = encodeURIComponent(`${artiste.name} official`);
+          const chRes = await chargerJSON(`${YT_BASE}/search?q=${qChan}&type=channel&maxResults=10`, { retries: 1, timeoutMs: 12000 });
+          const chans = (chRes && chRes.items) || [];
+          let bestChannelId = null;
+          let bestScore = -1;
+          chans.forEach(ch => {
+            const title = (ch.snippet && ch.snippet.channelTitle || "").toLowerCase();
+            let score = 0;
+            if (title.endsWith(" - topic")) score += 5;
+            if (title.includes("official")) score += 3;
+            if (title.includes("vevo")) score += 2;
+            if (title.includes(artiste.name.toLowerCase())) score += 1;
+            if (score > bestScore) { bestScore = score; bestChannelId = ch.id && ch.id.channelId; }
+          });
+          if (bestChannelId) {
+            const vRes = await chargerJSON(`${YT_BASE}/search?channelId=${bestChannelId}&type=video&videoEmbeddable=true&order=viewCount&maxResults=8`, { retries: 1, timeoutMs: 12000 });
+            videos = (vRes && vRes.items) || [];
+          }
+        } catch {}
+
+        if (videos.length === 0) {
+          const variants = [
+            `${artiste.name} - Topic`,
+            `${artiste.name} official audio`,
+            `${artiste.name} audio`,
+            `${artiste.name} full album`,
+            `${artiste.name} VEVO`
+          ];
+          for (const vq of variants) {
+            try {
+              const q = encodeURIComponent(vq);
+              const yres = await chargerJSON(`${YT_BASE}/search?q=${q}&type=video&videoEmbeddable=true&maxResults=8`, { retries: 1, timeoutMs: 12000 });
+              const items = (yres && yres.items) || [];
+              if (items.length > 0) { videos = items; break; }
+            } catch {}
+          }
+        }
+
+        let filtered = [];
+        try {
+          if (videos.length > 0) {
+            const ids = videos.map(v => v && v.id && (v.id.videoId || v.id.videoID || v.id.videoid)).filter(Boolean);
+            if (ids.length > 0) {
+              const vinfo = await chargerJSON(`${YT_BASE}/videos?part=snippet,contentDetails&id=${ids.join(',')}`, { retries: 1, timeoutMs: 12000 });
+              const items = (vinfo && vinfo.items) || [];
+              const parseIsoDuration = (iso) => {
+                const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso || "");
+                if (!m) return 0;
+                const h = parseInt(m[1]||"0",10), mm = parseInt(m[2]||"0",10), s = parseInt(m[3]||"0",10);
+                return h*3600 + mm*60 + s;
+              };
+              const infoById = new Map(items.map(it => [it.id, it]));
+              filtered = ids.map(id => {
+                const it = infoById.get(id);
+                if (!it) return null;
+                const cat = it.snippet && it.snippet.categoryId;
+                const dur = parseIsoDuration(it.contentDetails && it.contentDetails.duration);
+                if (cat === "10" && dur >= 120) return id;
+                return null;
+              }).filter(Boolean);
+            }
+          }
+        } catch {}
+
+        if ((!filtered || filtered.length === 0) && videos.length > 0) {
+          filtered = videos.map(v => v && v.id && (v.id.videoId || v.id.videoID || v.id.videoid)).filter(Boolean).slice(0,3);
+        }
+
+        if (!filtered || filtered.length === 0) {
+          const p = document.createElement("p");
+          p.className = "texte-gris";
+          p.textContent = "Aucune vidéo trouvée.";
+          ytWrap.appendChild(p);
+        } else {
+          filtered.forEach(vid => {
+            const iframe = document.createElement("iframe");
+            iframe.width = "100%";
+            iframe.height = "315";
+            iframe.src = `https://www.youtube.com/embed/${vid}`;
+            iframe.title = "YouTube video";
+            iframe.frameBorder = "0";
+            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+            iframe.allowFullscreen = true;
+            iframe.style.margin = "6px 0";
+            ytWrap.appendChild(iframe);
+          });
+        }
+      } catch (e) {
+        const p = document.createElement("p");
+        p.className = "texte-gris";
+        p.textContent = "Vidéos indisponibles pour le moment.";
+        ytWrap.appendChild(p);
+      }
+      ytSection.appendChild(ytWrap);
+      elts.corpsDetails.appendChild(ytSection);
       afficherErreur("");
 
     } catch (e) {

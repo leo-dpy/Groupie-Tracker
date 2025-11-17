@@ -78,7 +78,7 @@ function afficherGrille(liste) {
     card.dataset.id = String(a.id);
     card.title = `Voir les détails de ${a.name}`;
     card.innerHTML = `
-      <a href="details.html?id=${a.id}" style="text-decoration:none;color:inherit;display:block;">
+      <a href="/html/details.html?id=${a.id}" style="text-decoration:none;color:inherit;display:block;">
         <img loading="lazy" alt="${a.name}" src="${a.image}" />
         <div class="contenu">
           <div class="titre">${a.name}</div>
@@ -86,8 +86,8 @@ function afficherGrille(liste) {
         </div>
       </a>
     `;
-    card.addEventListener("click", () => { window.location.href = `details.html?id=${a.id}`; });
-    card.addEventListener("keydown", (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); window.location.href = `details.html?id=${a.id}`; } });
+    card.addEventListener("click", () => { window.location.href = `/html/details.html?id=${a.id}`; });
+    card.addEventListener("keydown", (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); window.location.href = `/html/details.html?id=${a.id}`; } });
     elts.grille.appendChild(card);
   }
 }
@@ -106,8 +106,7 @@ function appliquerFiltre(terme) {
 }
 
 async function afficherDetails(artiste) {
-  // redirection vers la page de détails dédiée
-  window.location.href = `details.html?id=${artiste.id}`;
+  window.location.href = `/html/details.html?id=${artiste.id}`;
 }
 
 async function demarrer() {
@@ -116,7 +115,6 @@ async function demarrer() {
     elts.grille.innerHTML = "";
     for (let i = 0; i < 8; i++) elts.grille.appendChild(carteSquelette());
 
-    // Warm up Heroku (cold starts can 502/503)
     try { await chargerJSON(`${BASE}`, { retries: 0, timeoutMs: 6000 }); } catch {}
 
     let data;
@@ -142,7 +140,6 @@ async function demarrer() {
 
 elts.recherche?.addEventListener("input", (e) => appliquerFiltre(e.target.value));
 
-// Event delegation: capture clicks if needed
 elts.grille?.addEventListener('click', (ev) => {
   const t = ev.target;
   const carte = t && typeof t.closest === 'function' ? t.closest('.carte') : null;

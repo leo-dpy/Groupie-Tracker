@@ -96,20 +96,29 @@ async function showDetail(artist) {
   state.selected = artist;
   els.detail.style.display = "block";
   els.detailBody.innerHTML = "";
+  // Clear any global error when opening details
+  setError("");
 
   const header = document.createElement("div");
   header.className = "section";
   header.innerHTML = `
-    <div style=\"display:flex;gap:14px;align-items:center;\">
-      <img alt=\"${artist.name}\" src=\"${artist.image}\" style=\"width:96px;height:96px;border-radius:10px;object-fit:cover;border:1px solid #232a3a;background:#0c0f16\" />
-      <div>
-        <h2 style=\"margin:0 0 6px 0;\">${artist.name}</h2>
-        <div class=\"muted\">Créé: ${artist.creationDate} • 1er album: ${artist.firstAlbum}</div>
-        <div style=\"margin-top:8px;\">${(artist.members||[]).map(m=>`<span class=\"badge\">${m}</span>`).join(" ")}</div>
+    <div style=\"display:flex;gap:14px;align-items:center;justify-content:space-between;\">
+      <div style=\"display:flex;gap:14px;align-items:center;\">
+        <img alt=\"${artist.name}\" src=\"${artist.image}\" style=\"width:96px;height:96px;border-radius:10px;object-fit:cover;border:1px solid #232a3a;background:#0c0f16\" />
+        <div>
+          <h2 style=\"margin:0 0 6px 0;\">${artist.name}</h2>
+          <div class=\"muted\">Créé: ${artist.creationDate} • 1er album: ${artist.firstAlbum}</div>
+          <div style=\"margin-top:8px;\">${(artist.members||[]).map(m=>`<span class=\"badge\">${m}</span>`).join(" ")}</div>
+        </div>
       </div>
+      <button id=\"close-detail\" style=\"background:#1a2336;color:#c9d6ff;border:1px solid #2c3650;border-radius:8px;padding:6px 10px;cursor:pointer;\">Fermer</button>
     </div>
   `;
   els.detailBody.appendChild(header);
+  header.querySelector('#close-detail')?.addEventListener('click', ()=>{
+    els.detail.style.display = 'none';
+    els.detailBody.innerHTML = '';
+  });
 
   const loading = document.createElement("div");
   loading.innerHTML = `
@@ -189,7 +198,11 @@ async function showDetail(artist) {
 
   } catch (e) {
     loading.remove();
-    setError(`Impossible de charger les détails: ${e.message}`);
+    // Show a local (inline) error inside the detail panel instead of global banner
+    const inlineErr = document.createElement("div");
+    inlineErr.className = "error";
+    inlineErr.textContent = `Impossible de charger certains détails: ${e.message}`;
+    els.detailBody.appendChild(inlineErr);
   }
 }
 

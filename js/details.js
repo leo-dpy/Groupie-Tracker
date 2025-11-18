@@ -5,6 +5,9 @@ const BASE_API = (location.hostname === "localhost" || location.hostname === "12
 let BASE = BASE_API;
 const YT_BASE = "/yt";
 
+// Disable global debug error banner by default; enable with ?debug=1
+const SHOW_GLOBAL_ERRORS = /(^|[?&])debug=1(&|$)/.test(location.search);
+
 const elts = {
   titre: document.getElementById("titre-artiste"),
   corpsDetails: document.getElementById("corps-details"),
@@ -16,13 +19,15 @@ function afficherErreur(msg) {
   elts.erreur.style.display = msg ? "block" : "none";
 }
 
-// Debug/erreurs globaux pour visibilité
-window.addEventListener('error', (e)=>{
-  try { afficherErreur(`Erreur JS: ${e.message}`); } catch {}
-});
-window.addEventListener('unhandledrejection', (e)=>{
-  try { afficherErreur(`Erreur Promesse: ${e.reason?.message || e.reason}`); } catch {}
-});
+// Debug/erreurs globaux pour visibilité (activé uniquement en mode debug)
+if (SHOW_GLOBAL_ERRORS) {
+  window.addEventListener('error', (e) => {
+    try { afficherErreur(`Erreur JS: ${e.message}`); } catch {}
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    try { afficherErreur(`Erreur Promesse: ${e.reason?.message || e.reason}`); } catch {}
+  });
+}
 
 function pause(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
@@ -79,7 +84,7 @@ async function chargerArtiste(id) {
     }
 
     elts.titre.textContent = artiste.name;
-    try { afficherErreur(`Debug: artiste ${id} chargé (base ${BASE}).`); } catch {}
+    if (SHOW_GLOBAL_ERRORS) { try { afficherErreur(`Debug: artiste ${id} chargé (base ${BASE}).`); } catch {} }
 
     // Reprend la logique de details depuis app.js (simplifiée)
     elts.corpsDetails.innerHTML = "";

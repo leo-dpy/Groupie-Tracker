@@ -4,6 +4,9 @@ const BASE_API = (location.hostname === "localhost" || location.hostname === "12
 
 let BASE = BASE_API;
 
+// Disable global debug error banner by default; enable with ?debug=1
+const SHOW_GLOBAL_ERRORS = /(^|[?&])debug=1(&|$)/.test(location.search);
+
 const etat = {
   artists: [],
   filtered: [],
@@ -16,13 +19,15 @@ const elts = {
   erreur: document.getElementById("erreur") || document.getElementById("error"),
 };
 
-// Catch JS errors and show them in the error banner for easier debug
-window.addEventListener('error', (e)=>{
-  try { afficherErreur(`Erreur JS: ${e.message}`); } catch {}
-});
-window.addEventListener('unhandledrejection', (e)=>{
-  try { afficherErreur(`Erreur Promesse: ${e.reason?.message || e.reason}`); } catch {}
-});
+// Catch JS errors: only show banner when explicitly in debug mode
+if (SHOW_GLOBAL_ERRORS) {
+  window.addEventListener('error', (e) => {
+    try { afficherErreur(`Erreur JS: ${e.message}`); } catch {}
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    try { afficherErreur(`Erreur Promesse: ${e.reason?.message || e.reason}`); } catch {}
+  });
+}
 
 function afficherErreur(msg) {
   elts.erreur.textContent = msg || "";

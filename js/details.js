@@ -14,6 +14,21 @@ const elts = {
   erreur: document.getElementById("erreur"),
 };
 
+let YT_API_LOAD_PROMISE = null;
+const ytPlayers = new Map();
+function ensureYTApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve();
+  if (YT_API_LOAD_PROMISE) return YT_API_LOAD_PROMISE;
+  YT_API_LOAD_PROMISE = new Promise((resolve) => {
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = function() { if (typeof prev === 'function') { try { prev(); } catch {} } resolve(); };
+    document.head.appendChild(tag);
+  });
+  return YT_API_LOAD_PROMISE;
+}
+
 function afficherErreur(msg) {
   elts.erreur.textContent = msg || "";
   elts.erreur.style.display = msg ? "block" : "none";
@@ -171,7 +186,7 @@ async function chargerArtiste(id) {
 
       const ytSection = document.createElement("div");
       ytSection.className = "bloc";
-      ytSection.innerHTML = `<h3>Vidéos YouTube</h3>`;
+      ytSection.innerHTML = `<h3>Lecteur audio</h3>`;
       const ytWrap = document.createElement("div");
       try {
         let videos = [];
@@ -233,7 +248,7 @@ async function chargerArtiste(id) {
                 if (!it) return null;
                 const cat = it.snippet && it.snippet.categoryId;
                 const dur = parseIsoDuration(it.contentDetails && it.contentDetails.duration);
-                if (cat === "10" && dur >= 120) return id;
+                if (cat === "10" && dur >= 120) return { id, title: (it.snippet && it.snippet.title) || "Piste" };
                 return null;
               }).filter(Boolean);
             }
@@ -241,7 +256,10 @@ async function chargerArtiste(id) {
         } catch {}
 
         if ((!filtered || filtered.length === 0) && videos.length > 0) {
-          filtered = videos.map(v => v && v.id && (v.id.videoId || v.id.videoID || v.id.videoid)).filter(Boolean).slice(0,3);
+          filtered = videos.map(v => {
+            const id = v && v.id && (v.id.videoId || v.id.videoID || v.id.videoid);
+            return id ? { id, title: (v.snippet && v.snippet.title) || "Piste" } : null;
+          }).filter(Boolean).slice(0,3);
         }
 
         if (!filtered || filtered.length === 0) {
@@ -250,17 +268,152 @@ async function chargerArtiste(id) {
           p.textContent = "Aucune vidéo trouvée.";
           ytWrap.appendChild(p);
         } else {
-          filtered.forEach(vid => {
-            const iframe = document.createElement("iframe");
-            iframe.width = "100%";
-            iframe.height = "315";
-            iframe.src = `https://www.youtube.com/embed/${vid}`;
-            iframe.title = "YouTube video";
-            iframe.frameBorder = "0";
-            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-            iframe.allowFullscreen = true;
-            iframe.style.margin = "6px 0";
-            ytWrap.appendChild(iframe);
+          const fmt = (t)=>{
+            t = Math.max(0, Math.floor(t||0));
+            const m = Math.floor(t/60);
+            const s = t%60; return `${m}:${String(s).padStart(2,'0')}`;
+          };
+          const stopOthers = (exceptId) => {
+            ytPlayers.forEach((obj,key)=>{
+              if (key === exceptId) return;
+              try { obj.player.pauseVideo(); } catch {}
+              if (obj.timer) { clearInterval(obj.timer); obj.timer = null; }
+              obj.btn.textContent = '▶';
+            });
+          };
+          await ensureYTApi();
+          filtered.forEach(({id: vid, title}) => {
+            const row = document.createElement('div');
+            row.className = 'audio-item';
+            row.innerHTML = `
+              <img class="audio-thumb" alt="" src="https://i.ytimg.com/vi/${vid}/hqdefault.jpg" />
+              <button class="audio-play" aria-label="Lire">▶</button>
+              <div class="audio-meta">
+                <div class="audio-title" title="${(title || '').replace(/&/g,'&amp;').replace(/\"/g,'&quot;')}">${title || ''}</div>
+                <div class="audio-bar" role="slider" aria-label="Position"><div class="audio-progress"></div></div>
+                <div class="audio-controls">
+                  <button class="audio-mute" aria-label="Muet">🔊</button>
+                  <div class="audio-time">0:00 / 0:00</div>
+                  <input class="audio-volume" type="range" min="0" max="100" value="60" aria-label="Volume" />
+                </div>
+              </div>
+              <div id="yt-holder-${vid}" class="visually-hidden"></div>
+            `;
+            const btn = row.querySelector('.audio-play');
+            const prog = row.querySelector('.audio-progress');
+            const timeEl = row.querySelector('.audio-time');
+            const vol = row.querySelector('.audio-volume');
+            const bar = row.querySelector('.audio-bar');
+            const muteBtn = row.querySelector('.audio-mute');
+            ytWrap.appendChild(row);
+            const create = () => {
+              const holder = row.querySelector(`#yt-holder-${vid}`);
+              const player = new YT.Player(holder, {
+                width: 320,
+                height: 180,
+                videoId: vid,
+                playerVars: { controls: 0, modestbranding: 1, rel: 0 },
+                events: {
+                  onReady: () => { try { player.setVolume(Number(vol.value)||60); } catch {} },
+                  onStateChange: (ev) => {
+                    if (ev.data === YT.PlayerState.ENDED) {
+                      btn.textContent = '▶';
+                      const obj = ytPlayers.get(vid);
+                      if (obj && obj.timer) { clearInterval(obj.timer); obj.timer = null; }
+                    }
+                  }
+                }
+              });
+              ytPlayers.set(vid, { player, btn, prog, timeEl, vol, bar, muteBtn, timer: null, dragging: false });
+              return player;
+            };
+            btn.addEventListener('click', async ()=>{
+              await ensureYTApi();
+              let obj = ytPlayers.get(vid);
+              if (!obj) { const p = create(); obj = ytPlayers.get(vid); }
+              const pl = obj.player;
+              const state = typeof pl.getPlayerState === 'function' ? pl.getPlayerState() : -1;
+              if (state === YT.PlayerState.PLAYING) {
+                pl.pauseVideo();
+                btn.textContent = '▶';
+                if (obj.timer) { clearInterval(obj.timer); obj.timer = null; }
+              } else {
+                stopOthers(vid);
+                pl.playVideo();
+                btn.textContent = '⏸';
+                if (obj.timer) { clearInterval(obj.timer); obj.timer = null; }
+                obj.timer = setInterval(()=>{
+                  try {
+                    const cur = pl.getCurrentTime() || 0;
+                    const dur = pl.getDuration() || 0;
+                    const pct = dur ? Math.min(100, (cur/dur)*100) : 0;
+                    if (!obj.dragging) { obj.prog.style.width = pct + '%'; }
+                    obj.timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+                  } catch {}
+                }, 500);
+              }
+            });
+            vol.addEventListener('input', async ()=>{
+              await ensureYTApi();
+              let obj = ytPlayers.get(vid);
+              if (!obj) { const p = create(); obj = ytPlayers.get(vid); }
+              try { obj.player.setVolume(Number(vol.value)||0); } catch {}
+            });
+            const getX = (ev) => {
+              if (ev.touches && ev.touches[0]) return ev.touches[0].clientX;
+              if (ev.changedTouches && ev.changedTouches[0]) return ev.changedTouches[0].clientX;
+              return ev.clientX;
+            };
+            const startDrag = async (ev)=>{
+              ev.preventDefault();
+              await ensureYTApi();
+              let obj = ytPlayers.get(vid);
+              if (!obj) { const p = create(); obj = ytPlayers.get(vid); }
+              obj.dragging = true;
+              const pl = obj.player;
+              const rect = bar.getBoundingClientRect();
+              const move = (e)=>{
+                try {
+                  const x = Math.max(0, Math.min(rect.width, getX(e) - rect.left));
+                  const frac = rect.width ? (x / rect.width) : 0;
+                  obj.prog.style.width = (frac*100) + '%';
+                } catch {}
+              };
+              const up = (e)=>{
+                try {
+                  const x = Math.max(0, Math.min(rect.width, getX(e) - rect.left));
+                  const frac = rect.width ? (x / rect.width) : 0;
+                  const dur = pl.getDuration() || 0;
+                  if (dur > 0) { pl.seekTo(dur * frac, true); }
+                } catch {}
+                obj.dragging = false;
+                window.removeEventListener('mousemove', move);
+                window.removeEventListener('mouseup', up);
+                window.removeEventListener('touchmove', move);
+                window.removeEventListener('touchend', up);
+              };
+              window.addEventListener('mousemove', move);
+              window.addEventListener('mouseup', up);
+              window.addEventListener('touchmove', move);
+              window.addEventListener('touchend', up);
+              move(ev);
+            };
+            bar.addEventListener('mousedown', startDrag);
+            bar.addEventListener('touchstart', startDrag, { passive: false });
+            muteBtn.addEventListener('click', async ()=>{
+              await ensureYTApi();
+              let obj = ytPlayers.get(vid);
+              if (!obj) { const p = create(); obj = ytPlayers.get(vid); }
+              try {
+                if (obj.player.isMuted && obj.player.isMuted()) {
+                  obj.player.unMute();
+                  muteBtn.textContent = '🔊';
+                } else {
+                  obj.player.mute();
+                  muteBtn.textContent = '🔇';
+                }
+              } catch {}
+            });
           });
         }
       } catch (e) {

@@ -119,11 +119,10 @@ async function chargerArtiste(id) {
 
     try {
       const idA = artiste.id;
-      const [locations, dates, relations] = await Promise.all([
+      const [locations, dates] = await Promise.all([
         chargerJSON(`${BASE}/locations/${idA}`),
         chargerJSON(`${BASE}/dates/${idA}`),
-        chargerJSON(`${BASE}/relation/${idA}`),
-      ]).catch(() => [null, null, null]);
+      ]).catch(() => [null, null]);
 
       loading.remove();
 
@@ -134,10 +133,15 @@ async function chargerArtiste(id) {
       const locWrap = document.createElement("div");
       const locArray = (locs[artiste.id]?.locations || locs.locations || locs || []);
       (locArray || []).forEach(l => {
-        const span = document.createElement("span");
-        span.className = "etiquette";
-        span.textContent = l;
-        locWrap.appendChild(span);
+        const a = document.createElement("a");
+        a.className = "etiquette";
+        a.textContent = l;
+        a.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l)}`;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.setAttribute('data-map', '1');
+        a.title = `Ouvrir sur Google Maps: ${l}`;
+        locWrap.appendChild(a);
       });
       locSection.appendChild(locWrap);
       elts.corpsDetails.appendChild(locSection);
@@ -151,26 +155,14 @@ async function chargerArtiste(id) {
       (datesArray || []).forEach(d => {
         const span = document.createElement("span");
         span.className = "etiquette";
-        span.textContent = d;
+        const clean = (d||"").toString().replace(/^[\*•\-\s]+/, "");
+        span.textContent = clean;
         dateWrap.appendChild(span);
       });
       dateSection.appendChild(dateWrap);
       elts.corpsDetails.appendChild(dateSection);
 
-      const relSection = document.createElement("div");
-      relSection.className = "bloc";
-      relSection.innerHTML = `<h3>Relations (lieu → dates)</h3>`;
-      const relData = relations?.relations || relations?.datesLocations || relations || {};
-      const map = (relData[artiste.id]?.datesLocations) || relData.datesLocations || relData || {};
-      const relList = document.createElement("div");
-      Object.entries(map).forEach(([place, dts]) => {
-        const line = document.createElement("div");
-        line.style.margin = "4px 0";
-        line.innerHTML = `<span class="etiquette">${place}</span> ${(dts||[]).map(d=>`<span class="etiquette">${d}</span>`).join(" ")}`;
-        relList.appendChild(line);
-      });
-      relSection.appendChild(relList);
-      elts.corpsDetails.appendChild(relSection);
+      // Section relations supprimée (jugée confuse)
 
       const ytSection = document.createElement("div");
       ytSection.className = "bloc";
@@ -302,3 +294,4 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   chargerArtiste(id);
 });
+

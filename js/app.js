@@ -15,7 +15,7 @@ const etat = {
 
 const elts = {
   grille: document.getElementById("grille") || document.getElementById("grid"),
-  recherche: document.getElementById("recherche") || document.getElementById("search"),
+  recherche: document.getElementById("nav-search") || document.getElementById("recherche") || document.getElementById("search"),
   erreur: document.getElementById("erreur") || document.getElementById("error"),
 };
 
@@ -155,3 +155,25 @@ elts.grille?.addEventListener('click', (ev) => {
 });
 
 window.addEventListener("DOMContentLoaded", demarrer);
+
+// Focus search when coming with #search or clicking the nav button
+function focusSearch() {
+  try {
+    elts.recherche?.focus();
+    if (elts.recherche?.select) elts.recherche.select();
+  } catch {}
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(location.search);
+  const q = params.get('q');
+  if (q) {
+    elts.recherche.value = q;
+    appliquerFiltre(q);
+  }
+  if (location.hash === '#search') { focusSearch(); }
+});
+
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#search') focusSearch();
+});

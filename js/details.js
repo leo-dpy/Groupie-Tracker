@@ -263,10 +263,23 @@ async function chargerArtiste(id) {
         }
 
         if (!filtered || filtered.length === 0) {
+          const wrap = document.createElement("div");
           const p = document.createElement("p");
           p.className = "texte-gris";
           p.textContent = "Aucune vidéo trouvée.";
-          ytWrap.appendChild(p);
+          const links = document.createElement("div");
+          links.style.marginTop = "8px";
+          const q = encodeURIComponent(`${artiste.name} official audio`);
+          const a = document.createElement("a");
+          a.href = `https://www.youtube.com/results?search_query=${q}`;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.className = "etiquette";
+          a.textContent = `Rechercher "${artiste.name}" sur YouTube`;
+          links.appendChild(a);
+          wrap.appendChild(p);
+          wrap.appendChild(links);
+          ytWrap.appendChild(wrap);
         } else {
           const fmt = (t)=>{
             t = Math.max(0, Math.floor(t||0));
@@ -316,10 +329,27 @@ async function chargerArtiste(id) {
                 events: {
                   onReady: () => { try { player.setVolume(Number(vol.value)||60); } catch {} },
                   onStateChange: (ev) => {
-                    if (ev.data === YT.PlayerState.ENDED) {
+                    const obj = ytPlayers.get(vid);
+                    if (!obj) return;
+                    if (ev.data === YT.PlayerState.PLAYING) {
+                      stopOthers(vid);
+                      btn.textContent = '⏸';
+                      if (obj.timer) { clearInterval(obj.timer); obj.timer = null; }
+                      obj.timer = setInterval(()=>{
+                        try {
+                          const cur = obj.player.getCurrentTime() || 0;
+                          const dur = obj.player.getDuration() || 0;
+                          const pct = dur ? Math.min(100, (cur/dur)*100) : 0;
+                          if (!obj.dragging) { obj.prog.style.width = pct + '%'; }
+                          obj.timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+                        } catch {}
+                      }, 500);
+                    } else if (ev.data === YT.PlayerState.PAUSED) {
                       btn.textContent = '▶';
-                      const obj = ytPlayers.get(vid);
-                      if (obj && obj.timer) { clearInterval(obj.timer); obj.timer = null; }
+                      if (obj.timer) { clearInterval(obj.timer); obj.timer = null; }
+                    } else if (ev.data === YT.PlayerState.ENDED) {
+                      btn.textContent = '▶';
+                      if (obj.timer) { clearInterval(obj.timer); obj.timer = null; }
                     }
                   }
                 }
@@ -417,10 +447,23 @@ async function chargerArtiste(id) {
           });
         }
       } catch (e) {
+        const wrap = document.createElement("div");
         const p = document.createElement("p");
         p.className = "texte-gris";
-        p.textContent = "Vidéos indisponibles pour le moment.";
-        ytWrap.appendChild(p);
+        p.textContent = "Vidéos indisponibles pour le moment (quota ou indisponibilité).";
+        const links = document.createElement("div");
+        links.style.marginTop = "8px";
+        const q = encodeURIComponent(`${artiste.name} official audio`);
+        const a = document.createElement("a");
+        a.href = `https://www.youtube.com/results?search_query=${q}`;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.className = "etiquette";
+        a.textContent = `Rechercher "${artiste.name}" sur YouTube`;
+        links.appendChild(a);
+        wrap.appendChild(p);
+        wrap.appendChild(links);
+        ytWrap.appendChild(wrap);
       }
       ytSection.appendChild(ytWrap);
       elts.corpsDetails.appendChild(ytSection);
@@ -442,6 +485,19 @@ async function chargerArtiste(id) {
 
 window.addEventListener("DOMContentLoaded", () => {
   const id = getIdFromQuery();
+  // Hook the header search to redirect to home with query
+  try {
+    const navSearch = document.getElementById('nav-search');
+    if (navSearch) {
+      navSearch.addEventListener('keydown', (ev)=>{
+        if (ev.key === 'Enter') {
+          const q = (navSearch.value || '').trim();
+          const url = q ? `/?q=${encodeURIComponent(q)}#search` : '/#search';
+          window.location.href = url;
+        }
+      });
+    }
+  } catch {}
   try {
     const sec = document.getElementById("details");
     if (sec) sec.style.display = "block";

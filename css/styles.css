@@ -27,6 +27,15 @@ header {
     margin: 0 auto
 }
 
+.bandeau { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid #2a3142; background: #141824; color: #e9eef7; text-decoration: none; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: #3b82f6; }
+.btn:focus { outline: 2px solid #3b82f6; outline-offset: 2px; }
+
+.bandeau { flex-wrap: wrap; }
+.search-input { width: min(48vw, 360px); padding: 8px 10px; border-radius: 8px; border: 1px solid #2a3142; background: #141824; color: #e9eef7; margin-left: auto; }
+.search-input:focus { outline: 2px solid #3b82f6; outline-offset: 2px; }
+
 h1 {
     font-size: 18px;
     margin: 0

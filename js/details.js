@@ -113,7 +113,7 @@ async function chargerArtiste(id) {
           <div>
             <h2 style="margin:0 0 6px 0;">${artiste.name}</h2>
             <div class="texte-gris">Créé: ${artiste.creationDate} • 1er album: ${artiste.firstAlbum}</div>
-            <div style="margin-top:8px;">${(artiste.members||[]).map(m=>`<span class="etiquette">${m}</span>`).join(" ")}</div>
+            <div style="margin-top:8px;">${(artiste.members||[]).map(m=>`<a href="https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(m)}" target="_blank" rel="noopener" class="etiquette" style="text-decoration:none;color:inherit;" title="Voir sur Wikipedia">${m}</a>`).join(" ")}</div>
           </div>
         </div>
       </div>
@@ -310,6 +310,10 @@ async function chargerArtiste(id) {
                   <input class="audio-volume" type="range" min="0" max="100" value="60" aria-label="Volume" />
                 </div>
               </div>
+              <div class="audio-actions" style="display:flex;flex-direction:column;gap:5px;">
+                <button class="btn-like" title="J'aime" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">🤍</button>
+                <button class="btn-playlist" title="Ajouter à une playlist" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">➕</button>
+              </div>
               <div id="yt-holder-${vid}" class="visually-hidden"></div>
             `;
             const btn = row.querySelector('.audio-play');
@@ -318,6 +322,35 @@ async function chargerArtiste(id) {
             const vol = row.querySelector('.audio-volume');
             const bar = row.querySelector('.audio-bar');
             const muteBtn = row.querySelector('.audio-mute');
+            const likeBtn = row.querySelector('.btn-like');
+            const playlistBtn = row.querySelector('.btn-playlist');
+
+            // Check if liked
+            const likes = JSON.parse(localStorage.getItem('likes') || '[]');
+            if (likes.some(l => l.id === vid)) {
+                likeBtn.textContent = '❤️';
+            }
+
+            likeBtn.addEventListener('click', () => {
+                let likes = JSON.parse(localStorage.getItem('likes') || '[]');
+                const idx = likes.findIndex(l => l.id === vid);
+                if (idx === -1) {
+                    likes.push({ id: vid, title: title, artist: artiste.name });
+                    likeBtn.textContent = '❤️';
+                    showToast("Ajouté aux J'aime", 'success');
+                } else {
+                    likes.splice(idx, 1);
+                    likeBtn.textContent = '🤍';
+                    showToast("Retiré des J'aime", 'success');
+                }
+                localStorage.setItem('likes', JSON.stringify(likes));
+            });
+
+            playlistBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openPlaylistModal(vid, title, artiste.name);
+            });
+
             ytWrap.appendChild(row);
             const create = () => {
               const holder = row.querySelector(`#yt-holder-${vid}`);
@@ -506,6 +539,85 @@ window.addEventListener("DOMContentLoaded", () => {
     afficherErreur("Aucun identifiant d'artiste fourni.");
     return;
   }
+  
+  const btnBiblio = document.getElementById('btn-biblio');
+  if (btnBiblio) {
+      btnBiblio.addEventListener('click', () => {
+          window.location.href = '/html/library.html';
+      });
+  }
+
   chargerArtiste(id);
 });
+
+function openPlaylistModal(vid, title, artist) {
+    const modal = document.getElementById('playlist-choice-modal');
+    const list = document.getElementById('playlist-choice-list');
+    const createBtn = document.getElementById('create-playlist-modal-btn');
+    const newNameInput = document.getElementById('new-playlist-name-modal');
+
+    if (!modal || !list) return;
+
+    const renderList = () => {
+        list.innerHTML = '';
+        const playlists = JSON.parse(localStorage.getItem('playlists') || '[]');
+        
+        if (playlists.length === 0) {
+            const p = document.createElement('p');
+            p.className = "texte-gris";
+            p.textContent = "Aucune playlist personnalisée.";
+            list.appendChild(p);
+        }
+        playlists.forEach(pl => {
+            const div = document.createElement('div');
+            div.style.padding = '10px';
+            div.style.background = '#111';
+            div.style.marginBottom = '5px';
+            div.style.cursor = 'pointer';
+            div.style.borderRadius = '4px';
+            div.textContent = pl.name;
+            div.addEventListener('click', () => {
+                addToPlaylist(pl.id, vid, title, artist);
+                modal.style.display = 'none';
+            });
+            list.appendChild(div);
+        });
+    };
+
+    renderList();
+    modal.style.display = 'flex';
+
+    // Use onclick to override previous listeners without cloning
+    if (createBtn && newNameInput) {
+        createBtn.onclick = () => {
+            const name = newNameInput.value.trim();
+            if (!name) {
+                showToast("Veuillez entrer un nom de playlist.", 'error');
+                return;
+            }
+            const playlists = JSON.parse(localStorage.getItem('playlists') || '[]');
+            const newPl = { id: Date.now(), name: name, songs: [] };
+            playlists.push(newPl);
+            localStorage.setItem('playlists', JSON.stringify(playlists));
+            showToast(`Playlist "${name}" créée et titre ajouté`, 'success');
+            addToPlaylist(newPl.id, vid, title, artist);
+            newNameInput.value = '';
+            modal.style.display = 'none';
+        };
+    }
+}
+
+function addToPlaylist(playlistId, vid, title, artist) {
+    const playlists = JSON.parse(localStorage.getItem('playlists') || '[]');
+    const idx = playlists.findIndex(p => p.id === playlistId);
+    if (idx !== -1) {
+        if (!playlists[idx].songs.some(s => s.id === vid)) {
+            playlists[idx].songs.push({ id: vid, title: title, artist: artist });
+            localStorage.setItem('playlists', JSON.stringify(playlists));
+            showToast(`Ajouté à la playlist "${playlists[idx].name}"`, 'success');
+        } else {
+            showToast('Déjà dans la playlist.', 'error');
+        }
+    }
+}
 

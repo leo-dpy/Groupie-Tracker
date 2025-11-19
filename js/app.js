@@ -156,6 +156,15 @@ elts.grille?.addEventListener('click', (ev) => {
 
 window.addEventListener("DOMContentLoaded", demarrer);
 
+window.addEventListener("DOMContentLoaded", () => {
+  const btnBiblio = document.getElementById('btn-biblio');
+  if (btnBiblio) {
+      btnBiblio.addEventListener('click', () => {
+          window.location.href = '/html/library.html';
+      });
+  }
+});
+
 // Focus search when coming with #search or clicking the nav button
 function focusSearch() {
   try {

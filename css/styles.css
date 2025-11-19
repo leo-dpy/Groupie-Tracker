@@ -128,7 +128,7 @@ main {
     text-decoration: none
 }
 
-.etiquette:hover { text-decoration: underline }
+.etiquette:hover { text-decoration: none }
 
 /* Améliore la perception de cliquable sur les badges-lien */
 .etiquette { cursor: pointer }
@@ -142,10 +142,24 @@ main {
     background: #141824;
     border: 1px solid #232a3a;
     color: #e9eef7;
-    padding: 10px 14px;
+    padding: 12px 20px;
     border-radius: 10px;
     box-shadow: 0 4px 14px rgba(0,0,0,.4);
     z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: opacity 0.3s ease;
+}
+
+.toast.success {
+    border-color: #232a3a;
+    background: #141824;
+}
+
+.toast.error {
+    border-color: #e91e63;
+    background: #2a1214;
 }
 
 .erreur {
@@ -181,7 +195,7 @@ main {
 }
 
 .visually-hidden { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-.audio-item { display: grid; grid-template-columns: 72px 40px auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid #232a3a; border-radius: 10px; background: #101521; margin: 6px 0; }
+.audio-item { display: grid; grid-template-columns: 72px 40px 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid #232a3a; border-radius: 10px; background: #101521; margin: 6px 0; }
 .audio-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid #232a3a; background:#0c0f16; }
 .audio-play { width: 40px; height: 40px; border-radius: 999px; border: 1px solid #2a3142; background: #141824; color: #e9eef7; cursor: pointer; }
 .audio-play:hover { border-color: #3b82f6; }

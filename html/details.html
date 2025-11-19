@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Détails artiste</title>
+    <link rel="icon" type="image/png" href="/image/favicon.png" />
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
   <body>
@@ -22,8 +23,23 @@
         <div id="corps-details"></div>
       </section>
       <div id="erreur" class="erreur" style="display:none"></div>
+      
+      <!-- Modal Choix Playlist -->
+      <div id="playlist-choice-modal" class="modal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000;">
+        <div class="modal-content" style="background: #1e2330; padding: 20px; border-radius: 10px; width: 300px; max-width: 90%;">
+            <h3>Ajouter à une playlist</h3>
+            <div id="playlist-choice-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px;"></div>
+            <div style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                <input type="text" id="new-playlist-name-modal" placeholder="Nouvelle playlist" style="width: 100%; padding: 5px; margin-bottom: 5px; background: #111; border: 1px solid #444; color: white;">
+                <button id="create-playlist-modal-btn" class="btn btn-small" style="width: 100%;">Créer & Ajouter</button>
+            </div>
+            <button class="btn btn-small" style="margin-top: 10px; background: #555;" onclick="document.getElementById('playlist-choice-modal').style.display='none'">Annuler</button>
+        </div>
+      </div>
+
       <div class="pied-de-page">Données: groupietrackers.herokuapp.com • Démo éducative</div>
     </main>
+    <script src="/js/toast.js"></script>
     <script src="/js/details.js" defer></script>
   </body>
 </html>

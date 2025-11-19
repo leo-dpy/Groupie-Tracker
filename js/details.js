@@ -107,14 +107,12 @@ async function chargerArtiste(id) {
     const header = document.createElement("div");
     header.className = "bloc";
     header.innerHTML = `
-      <div style="display:flex;gap:14px;align-items:center;justify-content:space-between;">
-        <div style="display:flex;gap:14px;align-items:center;">
-          <img alt="${artiste.name}" src="${artiste.image}" style="width:96px;height:96px;border-radius:10px;object-fit:cover;border:1px solid #232a3a;background:#0c0f16" />
-          <div>
-            <h2 style="margin:0 0 6px 0;">${artiste.name}</h2>
-            <div class="texte-gris">Créé: ${artiste.creationDate} • 1er album: ${artiste.firstAlbum}</div>
-            <div style="margin-top:8px;">${(artiste.members||[]).map(m=>`<a href="https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(m)}" target="_blank" rel="noopener" class="etiquette" style="text-decoration:none;color:inherit;" title="Voir sur Wikipedia">${m}</a>`).join(" ")}</div>
-          </div>
+      <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+        <img alt="${artiste.name}" src="${artiste.image}" style="width:120px;height:120px;border-radius:var(--radius-md);object-fit:cover;box-shadow:0 10px 30px rgba(0,0,0,0.3);" />
+        <div>
+          <h2 style="margin:0 0 8px 0;font-size:32px;font-weight:700;">${artiste.name}</h2>
+          <div class="texte-gris" style="font-size:14px;margin-bottom:12px;">Créé: ${artiste.creationDate} • 1er album: ${artiste.firstAlbum}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">${(artiste.members||[]).map(m=>`<a href="https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(m)}" target="_blank" rel="noopener" class="etiquette" title="Voir sur Wikipedia">${m}</a>`).join("")}</div>
         </div>
       </div>
     `;
@@ -123,16 +121,12 @@ async function chargerArtiste(id) {
     const loading = document.createElement("div");
     loading.innerHTML = `
       <div class="bloc">
-        <div class="squelette" style="width:40%;height:16px;margin-bottom:10px;"></div>
-        <div class="squelette" style="width:100%;height:44px;"></div>
+        <div class="squelette" style="width:40%;height:20px;margin-bottom:16px;"></div>
+        <div class="squelette" style="width:100%;height:60px;"></div>
       </div>
       <div class="bloc">
-        <div class="squelette" style="width:40%;height:16px;margin-bottom:10px;"></div>
-        <div class="squelette" style="width:100%;height:44px;"></div>
-      </div>
-      <div class="bloc">
-        <div class="squelette" style="width:40%;height:16px;margin-bottom:10px;"></div>
-        <div class="squelette" style="width:100%;height:44px;"></div>
+        <div class="squelette" style="width:40%;height:20px;margin-bottom:16px;"></div>
+        <div class="squelette" style="width:100%;height:60px;"></div>
       </div>
     `;
     elts.corpsDetails.appendChild(loading);
@@ -570,11 +564,10 @@ function openPlaylistModal(vid, title, artist) {
         }
         playlists.forEach(pl => {
             const div = document.createElement('div');
-            div.style.padding = '10px';
-            div.style.background = '#111';
-            div.style.marginBottom = '5px';
+            div.className = 'audio-item';
             div.style.cursor = 'pointer';
-            div.style.borderRadius = '4px';
+            div.style.display = 'block';
+            div.style.marginBottom = '8px';
             div.textContent = pl.name;
             div.addEventListener('click', () => {
                 addToPlaylist(pl.id, vid, title, artist);

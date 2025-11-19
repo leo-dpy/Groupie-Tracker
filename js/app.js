@@ -38,10 +38,10 @@ function carteSquelette() {
   const card = document.createElement("div");
   card.className = "carte";
   card.innerHTML = `
-    <div class="squelette" style="width:100%;height:160px;"></div>
+    <div class="squelette" style="width:100%;aspect-ratio:1;"></div>
     <div class="contenu">
-      <div class="squelette" style="width:70%;height:14px;margin:6px 0;"></div>
-      <div class="squelette" style="width:50%;height:12px;margin:6px 0;"></div>
+      <div class="squelette" style="width:70%;height:14px;margin-bottom:8px;"></div>
+      <div class="squelette" style="width:50%;height:12px;"></div>
     </div>
   `;
   return card;

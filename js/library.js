@@ -62,7 +62,6 @@ function createPlayerItem(song, container, onDelete, onEnded) {
     const title = song.title;
     const row = document.createElement('div');
     row.className = 'audio-item';
-    row.style.marginBottom = '10px';
     row.innerHTML = `
         <img class="audio-thumb" alt="" src="https://i.ytimg.com/vi/${vid}/hqdefault.jpg" />
         <button class="audio-play" aria-label="Lire">▶</button>
@@ -399,8 +398,7 @@ function openPlaylistView(playlistId, autoPlay = false) {
 
         // Actions: Rename, Delete
         const btnRename = document.createElement('button');
-        btnRename.className = 'btn btn-small';
-        btnRename.style.background = '#555';
+        btnRename.className = 'btn';
         btnRename.textContent = 'Renommer';
         btnRename.onclick = () => {
             openRenameModal(pl.name, (newName) => {
@@ -412,8 +410,9 @@ function openPlaylistView(playlistId, autoPlay = false) {
         elts.playlistActions.appendChild(btnRename);
 
         const btnDelete = document.createElement('button');
-        btnDelete.className = 'btn btn-small';
-        btnDelete.style.background = '#e91e63';
+        btnDelete.className = 'btn';
+        btnDelete.style.borderColor = 'rgba(248, 113, 113, 0.3)';
+        btnDelete.style.color = '#f87171';
         btnDelete.textContent = 'Supprimer';
         btnDelete.onclick = () => {
             openConfirmModal('Supprimer la playlist', 'Voulez-vous vraiment supprimer cette playlist ?', () => {

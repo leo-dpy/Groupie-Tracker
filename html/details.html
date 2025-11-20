@@ -29,11 +29,13 @@
         <div class="modal-content">
             <h3>Ajouter à une playlist</h3>
             <div id="playlist-choice-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px;"></div>
-            <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px;">
-                <input type="text" id="new-playlist-name-modal" placeholder="Nouvelle playlist">
-                <button id="create-playlist-modal-btn" class="btn" style="width: 100%;">Créer & Ajouter</button>
+            <div class="playlist-modal-actions" style="margin-top:10px; border-top:1px solid var(--card-border); padding-top:10px;">
+                <input type="text" id="new-playlist-name-modal" placeholder="Nouvelle playlist" style="margin-bottom:10px;">
+                <div class="buttons-row">
+                  <button id="create-playlist-modal-btn" class="btn" style="flex:1;">Créer & Ajouter</button>
+                  <button id="cancel-playlist-modal-btn" type="button" class="btn btn-secondary">Annuler</button>
+                </div>
             </div>
-            <button class="btn" style="margin-top: 10px; background: transparent; border: 1px solid var(--card-border);" onclick="document.getElementById('playlist-choice-modal').style.display='none'">Annuler</button>
         </div>
       </div>
 

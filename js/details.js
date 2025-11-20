@@ -549,6 +549,7 @@ function openPlaylistModal(vid, title, artist) {
     const list = document.getElementById('playlist-choice-list');
     const createBtn = document.getElementById('create-playlist-modal-btn');
     const newNameInput = document.getElementById('new-playlist-name-modal');
+  const cancelBtn = document.getElementById('cancel-playlist-modal-btn');
 
     if (!modal || !list) return;
 
@@ -580,6 +581,23 @@ function openPlaylistModal(vid, title, artist) {
     renderList();
     modal.style.display = 'flex';
 
+    // Attach one-time listeners for overlay click & Escape
+    if (!modal.dataset.listenersAttached) {
+      modal.addEventListener('click', (e) => {
+        // Click outside modal-content closes
+        const content = modal.querySelector('.modal-content');
+        if (content && !content.contains(e.target)) {
+          modal.style.display = 'none';
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display !== 'none') {
+          modal.style.display = 'none';
+        }
+      });
+      modal.dataset.listenersAttached = '1';
+    }
+
     // Use onclick to override previous listeners without cloning
     if (createBtn && newNameInput) {
         createBtn.onclick = () => {
@@ -597,6 +615,12 @@ function openPlaylistModal(vid, title, artist) {
             newNameInput.value = '';
             modal.style.display = 'none';
         };
+    }
+
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        modal.style.display = 'none';
+      };
     }
 }
 

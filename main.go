@@ -1,19 +1,64 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
-    "net/url"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"  
+	"time"
 )
 
 const remoteBase = "https://groupietrackers.herokuapp.com/api"
 const ytBase = "https://www.googleapis.com/youtube/v3"
+
+// Data models
+type Artist struct {
+	ID           int      `json:"id"`
+	Image        string   `json:"image"`
+	Name         string   `json:"name"`
+	Members      []string `json:"members"`
+	CreationDate int      `json:"creationDate"`
+	FirstAlbum   string   `json:"firstAlbum"`
+	Locations    string   `json:"locations"`
+	ConcertDates string   `json:"concertDates"`
+	Relations    string   `json:"relations"`
+}
+
+type Location struct {
+	ID        int      `json:"id"`
+	Locations []string `json:"locations"`
+	Dates     string   `json:"dates"`
+}
+
+type DateInfo struct {
+	ID    int      `json:"id"`
+	Dates []string `json:"dates"`
+}
+
+type Relation struct {
+	ID             int                 `json:"id"`
+	DatesLocations map[string][]string `json:"datesLocations"`
+}
+
+type RelationsIndex struct {
+	Index []Relation `json:"index"`
+}
+
+type CombinedArtist struct {
+	Artist
+	Shows []Show `json:"shows,omitempty"`
+}
+
+type Show struct {
+	Date     string `json:"date"`
+	Location string `json:"location"`
+}
 
 // Simple in-memory cache
 var (
@@ -69,33 +114,177 @@ type httpError struct {
 
 func (e *httpError) Error() string { return e.Message }
 
+// Fetch and parse JSON from external API
+func fetchAndParse(endpoint string, v interface{}) error {
+	url := remoteBase + endpoint
+	b, _, err := getWithCache(url)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, v)
+}
+
+// Get all data and combine
+func getCombinedData() ([]CombinedArtist, error) {
+	var artists []Artist
+	var relationsData RelationsIndex
+
+	// Fetch artists and relations in parallel
+	var wg sync.WaitGroup
+	var errArtists, errRelations error
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		errArtists = fetchAndParse("/artists", &artists)
+	}()
+	go func() {
+		defer wg.Done()
+		errRelations = fetchAndParse("/relation", &relationsData)
+	}()
+	wg.Wait()
+
+	if errArtists != nil {
+		return nil, fmt.Errorf("failed to fetch artists: %w", errArtists)
+	}
+	if errRelations != nil {
+		return nil, fmt.Errorf("failed to fetch relations: %w", errRelations)
+	}
+
+	// Build a map of artist ID to shows
+	relationMap := make(map[int][]Show)
+	for _, rel := range relationsData.Index {
+		var shows []Show
+		for location, dates := range rel.DatesLocations {
+			for _, date := range dates {
+				shows = append(shows, Show{
+					Date:     date,
+					Location: location,
+				})
+			}
+		}
+		relationMap[rel.ID] = shows
+	}
+
+	// Combine artists with their shows
+	combined := make([]CombinedArtist, len(artists))
+	for i, artist := range artists {
+		combined[i] = CombinedArtist{
+			Artist: artist,
+			Shows:  relationMap[artist.ID],
+		}
+	}
+
+	return combined, nil
+}
+
+// Handler for /api/combined - returns enriched artist data
+func combinedHandler(w http.ResponseWriter, r *http.Request) {
+	data, err := getCombinedData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(data)
+}
+
+// Handler for /api/search?q=term - server-side filtering
+func searchHandler(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+
+	data, err := getCombinedData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	// If no query, return all
+	if query == "" {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		json.NewEncoder(w).Encode(data)
+		return
+	}
+
+	// Filter by name or members
+	var filtered []CombinedArtist
+	for _, artist := range data {
+		if strings.Contains(strings.ToLower(artist.Name), query) {
+			filtered = append(filtered, artist)
+			continue
+		}
+		for _, member := range artist.Members {
+			if strings.Contains(strings.ToLower(member), query) {
+				filtered = append(filtered, artist)
+				break
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(filtered)
+}
+
+// Handler for /api/artist/:id - get single artist with shows
+func artistByIDHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/artist/")
+	if idStr == "" {
+		http.Error(w, "artist ID required", http.StatusBadRequest)
+		return
+	}
+
+	data, err := getCombinedData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	// Find artist by ID (simple string match)
+	for _, artist := range data {
+		if fmt.Sprint(artist.ID) == idStr {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			json.NewEncoder(w).Encode(artist)
+			return
+		}
+	}
+
+	http.Error(w, "artist not found", http.StatusNotFound)
+}
+
+// Legacy proxy for backwards compatibility (kept minimal)
 func apiProxy(w http.ResponseWriter, r *http.Request) {
-	// Map /api/... -> remoteBase/...
 	path := strings.TrimPrefix(r.URL.Path, "/api")
 	if path == "" || path == "/" {
-		// return the remote API root links
 		b, ctype, err := getWithCache(remoteBase)
-		if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
 		w.Header().Set("Content-Type", ctype)
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
 		return
 	}
 
-	// sanitize and forward
 	url := remoteBase + path
 	b, ctype, err := getWithCache(url)
-	if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
 	w.Header().Set("Content-Type", ctype)
 	w.WriteHeader(http.StatusOK)
 	w.Write(b)
 }
 
-
 func ytProxy(w http.ResponseWriter, r *http.Request) {
 	key := os.Getenv("YT_API_KEY")
 	if key == "" {
-		http.Error(w, "YouTube API key missing. Set YT_API_KEY env var.", http.StatusServiceUnavailable)
+		key = os.Getenv("YOUTUBE_API_KEY") // Also check YOUTUBE_API_KEY
+	}
+	if key == "" {
+		http.Error(w, "YouTube API key missing. Set YT_API_KEY or YOUTUBE_API_KEY env var.", http.StatusServiceUnavailable)
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/yt")
@@ -109,25 +298,49 @@ func ytProxy(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(path, "/search") {
 		u, _ := url.Parse(ytBase + "/search")
 		q := u.Query()
-		for k, vals := range r.URL.Query() { for _, v := range vals { q.Add(k, v) } }
-		if q.Get("part") == "" { q.Set("part", "snippet") }
-		if q.Get("type") == "" { q.Set("type", "video") }
-		if q.Get("maxResults") == "" { q.Set("maxResults", "3") }
+		for k, vals := range r.URL.Query() {
+			for _, v := range vals {
+				q.Add(k, v)
+			}
+		}
+		if q.Get("part") == "" {
+			q.Set("part", "snippet")
+		}
+		if q.Get("type") == "" {
+			q.Set("type", "video")
+		}
+		if q.Get("maxResults") == "" {
+			q.Set("maxResults", "3")
+		}
 		q.Set("key", key)
 		u.RawQuery = q.Encode()
 
 		req, err := http.NewRequest("GET", u.String(), nil)
-		if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
 		req.Header.Set("Referer", "http://localhost:8080/")
-		client := &http.Client{ Timeout: 12 * time.Second }
+		client := &http.Client{Timeout: 12 * time.Second}
 		resp, err := client.Do(req)
-		if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
 		defer resp.Body.Close()
 		b, err := io.ReadAll(resp.Body)
-		if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
-		if resp.StatusCode >= 400 { http.Error(w, string(b), resp.StatusCode); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		if resp.StatusCode >= 400 {
+			http.Error(w, string(b), resp.StatusCode)
+			return
+		}
 		ctype := resp.Header.Get("Content-Type")
-		if ctype == "" { ctype = "application/json; charset=utf-8" }
+		if ctype == "" {
+			ctype = "application/json; charset=utf-8"
+		}
 		w.Header().Set("Content-Type", ctype)
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
@@ -138,23 +351,43 @@ func ytProxy(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(path, "/videos") {
 		u, _ := url.Parse(ytBase + "/videos")
 		q := u.Query()
-		for k, vals := range r.URL.Query() { for _, v := range vals { q.Add(k, v) } }
-		if q.Get("part") == "" { q.Set("part", "snippet,contentDetails") }
+		for k, vals := range r.URL.Query() {
+			for _, v := range vals {
+				q.Add(k, v)
+			}
+		}
+		if q.Get("part") == "" {
+			q.Set("part", "snippet,contentDetails")
+		}
 		q.Set("key", key)
 		u.RawQuery = q.Encode()
 
 		req, err := http.NewRequest("GET", u.String(), nil)
-		if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
 		req.Header.Set("Referer", "http://localhost:8080/")
-		client := &http.Client{ Timeout: 12 * time.Second }
+		client := &http.Client{Timeout: 12 * time.Second}
 		resp, err := client.Do(req)
-		if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
 		defer resp.Body.Close()
 		b, err := io.ReadAll(resp.Body)
-		if err != nil { http.Error(w, err.Error(), http.StatusBadGateway); return }
-		if resp.StatusCode >= 400 { http.Error(w, string(b), resp.StatusCode); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		if resp.StatusCode >= 400 {
+			http.Error(w, string(b), resp.StatusCode)
+			return
+		}
 		ctype := resp.Header.Get("Content-Type")
-		if ctype == "" { ctype = "application/json; charset=utf-8" }
+		if ctype == "" {
+			ctype = "application/json; charset=utf-8"
+		}
 		w.Header().Set("Content-Type", ctype)
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
@@ -174,7 +407,16 @@ func withLogging(next http.Handler) http.Handler {
 func main() {
 	mux := http.NewServeMux()
 
-	// API proxy
+	// New Go-powered endpoints with data manipulation
+	mux.HandleFunc("/api/combined", combinedHandler)
+	mux.HandleFunc("/api/search", searchHandler)
+	mux.HandleFunc("/api/artist/", artistByIDHandler)
+
+	// Legacy proxy (for raw access if needed)
+	mux.HandleFunc("/api/artists", apiProxy)
+	mux.HandleFunc("/api/locations", apiProxy)
+	mux.HandleFunc("/api/dates", apiProxy)
+	mux.HandleFunc("/api/relation", apiProxy)
 	mux.HandleFunc("/api", apiProxy)
 	mux.HandleFunc("/api/", apiProxy)
 
@@ -200,6 +442,7 @@ func main() {
 
 	abs, _ := filepath.Abs(".")
 	log.Printf("Serving %s on http://localhost%s", abs, addr)
+	log.Printf("API endpoints: /api/combined, /api/search?q=term, /api/artist/:id")
 	if err := http.ListenAndServe(addr, withLogging(mux)); err != nil {
 		log.Fatal(err)
 	}

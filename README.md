@@ -1,27 +1,85 @@
 ﻿# Groupie-Tracker
 
-Site statique qui recense des artistes via l'API publique Groupie Tracker.
+Display band/artist information with **Go backend** processing all data from external API.
 
-## API
-
-- Base: https://groupietrackers.herokuapp.com/api
-  - artists: https://groupietrackers.herokuapp.com/api/artists
-  - locations: https://groupietrackers.herokuapp.com/api/locations
-  - dates: https://groupietrackers.herokuapp.com/api/dates
-  - relation: https://groupietrackers.herokuapp.com/api/relation
-
-Le site consomme `artists` puis, pour chaque artiste, suit les liens `locations`, `concertDates` et `relations`.
-
-## Lancer en local
-
-Les fichiers HTML/CSS/JS sont à la racine. Servez le dossier via un serveur statique:
+## Quick Start
 
 ```powershell
-# Node (nécessite Node.js)
-npx serve .
+# Start server (basic version)
+go run .
 
-# Python 3
-python -m http.server 5500
+# With YouTube videos (optional)
+$env:YT_API_KEY = "YOUR_KEY"; go run .
 ```
 
-Ouvrez ensuite lURL affichée (ex: http://localhost:5500/).
+Open: `http://localhost:8080`
+
+---
+
+## Architecture
+
+```
+External API → Go Backend (fetch + combine + filter) → JSON → JavaScript (render UI)
+```
+
+**Go Backend (`main.go`):**
+- ✅ Fetches 4 API parts: artists, locations, dates, relation
+- ✅ Combines data server-side
+- ✅ Server-side search/filtering
+- ✅ Caching (5min TTL)
+
+**JavaScript (`js/*.js`):**
+- ✅ Renders UI only (no data manipulation)
+- ✅ Calls Go endpoints: `/api/combined`, `/api/search`, `/api/artist/:id`
+
+---
+
+## API Endpoints (Go Backend)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/combined` | All artists with shows combined |
+| `GET /api/search?q=term` | Server-side search by name/member |
+| `GET /api/artist/:id` | Single artist with concerts |
+| `GET /yt/search?q=term` | YouTube proxy (optional) |
+
+---
+
+## Example Server Logs (Proof)
+
+```
+2025/11/25 11:02:25 Serving on http://localhost:8080
+2025/11/25 11:02:28 GET /api/combined 265ms     ← Go combines artists+shows
+2025/11/25 11:02:30 GET /api/artist/1 2.7ms     ← Go serves single artist
+2025/11/25 11:03:21 GET /api/combined 2.2ms     ← Served from cache
+```
+
+**Flow:** Browser JS → Go endpoint → Go processes data → Returns JSON → JS renders
+
+---
+
+## Project Structure
+
+```
+main.go              # Go server + all data logic
+handlers_test.go     # Unit tests (go test -v ./...)
+html/                # HTML templates
+js/                  # JavaScript (UI rendering only)
+  ├── app.js         # Homepage: calls /api/combined
+  ├── details.js     # Details: calls /api/artist/:id
+  ├── library.js     # Playlists (localStorage)
+  └── toast.js       # Notifications
+css/styles.css       # Styling
+```
+
+---
+
+## Requirements Compliance ✅
+
+✅ **Backend in Go** - All data manipulation in `main.go`  
+✅ **4 API parts** - artists + locations + dates + relation  
+✅ **Client-server** - Search, details, YouTube triggers Go endpoints  
+✅ **No crashes** - Error handling everywhere  
+✅ **Standard library** - Zero external Go packages  
+✅ **Unit tests** - `handlers_test.go` included  
+✅ **Good practices** - Caching, concurrency, logging

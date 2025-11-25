@@ -1,8 +1,5 @@
-const BASE_API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
-  ? "/api"
-  : "https://groupietrackers.herokuapp.com/api";
-
-let BASE = BASE_API;
+// All data comes from Go backend
+const BASE_API = "/api";
 const YT_BASE = "/yt";
 
 // Disable global debug error banner by default; enable with ?debug=1
@@ -75,31 +72,17 @@ async function chargerArtiste(id) {
     afficherErreur("");
     elts.corpsDetails.innerHTML = "Chargement...";
 
-    // Warm up base & fetch artists
-    try { await chargerJSON(`${BASE}`, { retries: 0, timeoutMs: 6000 }); } catch {}
-
-    let data;
-    try {
-      data = await chargerJSON(`${BASE}/artists`, { retries: 2, timeoutMs: 12000 });
-    } catch (e1) {
-      if (BASE !== "https://groupietrackers.herokuapp.com/api") {
-        BASE = "https://groupietrackers.herokuapp.com/api";
-        data = await chargerJSON(`${BASE}/artists`, { retries: 2, timeoutMs: 12000 });
-      } else {
-        throw e1;
-      }
-    }
-
-    const artistes = Array.isArray(data) ? data : data?.data || [];
-    const artiste = artistes.find(a => a.id === id);
-    if (!artiste) {
+    // Fetch artist data from Go backend (all data manipulation done server-side)
+    const artiste = await chargerJSON(`/api/artist/${id}`, { retries: 2, timeoutMs: 12000 });
+    
+    if (!artiste || !artiste.id) {
       afficherErreur("Artiste introuvable.");
       elts.corpsDetails.innerHTML = "";
       return;
     }
 
     elts.titre.textContent = artiste.name;
-    if (SHOW_GLOBAL_ERRORS) { try { afficherErreur(`Debug: artiste ${id} chargé (base ${BASE}).`); } catch {} }
+    if (SHOW_GLOBAL_ERRORS) { try { afficherErreur(`Debug: artiste ${id} chargé depuis Go backend.`); } catch {} }
 
     // Reprend la logique de details depuis app.js (simplifiée)
     elts.corpsDetails.innerHTML = "";
@@ -132,29 +115,28 @@ async function chargerArtiste(id) {
     elts.corpsDetails.appendChild(loading);
 
     try {
-      const idA = artiste.id;
-      const [locations, dates] = await Promise.all([
-        chargerJSON(`${BASE}/locations/${idA}`),
-        chargerJSON(`${BASE}/dates/${idA}`),
-      ]).catch(() => [null, null]);
-
+      // Shows data already comes from Go backend in artiste.shows
       loading.remove();
 
       const locSection = document.createElement("div");
       locSection.className = "bloc";
-      locSection.innerHTML = `<h3>Villes / Lieux</h3>`;
-      const locs = locations?.locations || locations?.data || locations || {};
+      locSection.innerHTML = `<h3>Concerts</h3>`;
       const locWrap = document.createElement("div");
-      const locArray = (locs[artiste.id]?.locations || locs.locations || locs || []);
-      (locArray || []).forEach(l => {
+      
+      // Extract locations from shows (Go already combined this)
+      const shows = artiste.shows || [];
+      const locations = [...new Set(shows.map(s => s.location))]; // unique locations
+      
+      locations.forEach(l => {
         const a = document.createElement("a");
         a.className = "etiquette";
-        a.textContent = l;
-        a.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l)}`;
+        const cleanLoc = (l || "").replace(/-/g, ", ").replace(/_/g, " ");
+        a.textContent = cleanLoc;
+        a.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanLoc)}`;
         a.target = "_blank";
         a.rel = "noopener";
         a.setAttribute('data-map', '1');
-        a.title = `Ouvrir sur Google Maps: ${l}`;
+        a.title = `Ouvrir sur Google Maps: ${cleanLoc}`;
         locWrap.appendChild(a);
       });
       locSection.appendChild(locWrap);
@@ -163,10 +145,11 @@ async function chargerArtiste(id) {
       const dateSection = document.createElement("div");
       dateSection.className = "bloc";
       dateSection.innerHTML = `<h3>Dates de concert</h3>`;
-      const datesData = dates?.dates || dates?.data || dates || {};
       const dateWrap = document.createElement("div");
-      const datesArray = (datesData[artiste.id]?.dates || datesData.dates || datesData || []);
-      (datesArray || []).forEach(d => {
+      
+      // Extract dates from shows (Go already combined this)
+      const dates = [...new Set(shows.map(s => s.date))]; // unique dates
+      dates.forEach(d => {
         const span = document.createElement("span");
         span.className = "etiquette";
         const clean = (d||"").toString().replace(/^[\*•\-\s]+/, "");
@@ -182,6 +165,21 @@ async function chargerArtiste(id) {
       ytSection.className = "bloc";
       ytSection.innerHTML = `<h3>Lecteur audio</h3>`;
       const ytWrap = document.createElement("div");
+      
+      // Always show the YouTube search link for the artist
+      const searchLinkDiv = document.createElement("div");
+      searchLinkDiv.style.marginBottom = "16px";
+      const q = encodeURIComponent(`${artiste.name} official audio`);
+      const searchLink = document.createElement("a");
+      searchLink.href = `https://www.youtube.com/results?search_query=${q}`;
+      searchLink.target = "_blank";
+      searchLink.rel = "noopener";
+      searchLink.className = "etiquette";
+      searchLink.style.display = "inline-block";
+      searchLink.textContent = `🎵 Rechercher "${artiste.name}" sur YouTube`;
+      searchLinkDiv.appendChild(searchLink);
+      ytWrap.appendChild(searchLinkDiv);
+      
       try {
         let videos = [];
         try {
@@ -260,19 +258,9 @@ async function chargerArtiste(id) {
           const wrap = document.createElement("div");
           const p = document.createElement("p");
           p.className = "texte-gris";
-          p.textContent = "Aucune vidéo trouvée.";
-          const links = document.createElement("div");
-          links.style.marginTop = "8px";
-          const q = encodeURIComponent(`${artiste.name} official audio`);
-          const a = document.createElement("a");
-          a.href = `https://www.youtube.com/results?search_query=${q}`;
-          a.target = "_blank";
-          a.rel = "noopener";
-          a.className = "etiquette";
-          a.textContent = `Rechercher "${artiste.name}" sur YouTube`;
-          links.appendChild(a);
+          p.style.fontStyle = "italic";
+          p.textContent = "Lecteur vidéo non disponible (nécessite une clé API YouTube).";
           wrap.appendChild(p);
-          wrap.appendChild(links);
           ytWrap.appendChild(wrap);
         } else {
           const fmt = (t)=>{

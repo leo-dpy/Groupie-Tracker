@@ -1,16 +1,12 @@
-const BASE_API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
-  ? "/api"
-  : "https://groupietrackers.herokuapp.com/api";
-
-let BASE = BASE_API;
+// All data manipulation now happens on the Go backend
+const BASE_API = "/api";
 
 // Disable global debug error banner by default; enable with ?debug=1
 const SHOW_GLOBAL_ERRORS = /(^|[?&])debug=1(&|$)/.test(location.search);
 
 const etat = {
   artists: [],
-  filtered: [],
-  selected: null,
+  searchTerm: "",
 };
 
 const elts = {
@@ -82,12 +78,16 @@ function afficherGrille(liste) {
     card.setAttribute('tabindex', '0');
     card.dataset.id = String(a.id);
     card.title = `Voir les détails de ${a.name}`;
+    
+    // Show number of concerts if available (data comes from Go backend)
+    const showsInfo = a.shows && a.shows.length > 0 ? ` • ${a.shows.length} concerts` : '';
+    
     card.innerHTML = `
       <a href="/html/details.html?id=${a.id}" style="text-decoration:none;color:inherit;display:block;">
         <img loading="lazy" alt="${a.name}" src="${a.image}" />
         <div class="contenu">
           <div class="titre">${a.name}</div>
-          <div class="texte-gris">Créé: ${a.creationDate} • 1er album: ${a.firstAlbum}</div>
+          <div class="texte-gris">Créé: ${a.creationDate} • 1er album: ${a.firstAlbum}${showsInfo}</div>
         </div>
       </a>
     `;
@@ -97,53 +97,58 @@ function afficherGrille(liste) {
   }
 }
 
-function appliquerFiltre(terme) {
-  const t = (terme || "").trim().toLowerCase();
-  if (!t) {
-    etat.filtered = etat.artists.slice();
-  } else {
-    etat.filtered = etat.artists.filter(a =>
-      a.name.toLowerCase().includes(t) ||
-      (a.members || []).some(m => m.toLowerCase().includes(t))
-    );
+// Search is now handled server-side via Go backend
+async function appliquerFiltre(terme) {
+  try {
+    afficherErreur("");
+    const t = (terme || "").trim();
+    etat.searchTerm = t;
+    
+    // Show loading skeletons
+    elts.grille.innerHTML = "";
+    for (let i = 0; i < 4; i++) elts.grille.appendChild(carteSquelette());
+    
+    // Call Go backend search endpoint
+    const url = t ? `${BASE_API}/search?q=${encodeURIComponent(t)}` : `${BASE_API}/combined`;
+    const data = await chargerJSON(url, { retries: 1, timeoutMs: 10000 });
+    
+    etat.artists = Array.isArray(data) ? data : [];
+    afficherGrille(etat.artists);
+  } catch (e) {
+    afficherErreur(`Erreur de recherche: ${e.message}`);
+    elts.grille.innerHTML = "";
   }
-  afficherGrille(etat.filtered);
 }
 
 async function afficherDetails(artiste) {
   window.location.href = `/html/details.html?id=${artiste.id}`;
 }
 
+// Load combined data from Go backend (artists + shows already merged)
 async function demarrer() {
   try {
     afficherErreur("");
     elts.grille.innerHTML = "";
     for (let i = 0; i < 8; i++) elts.grille.appendChild(carteSquelette());
 
-    try { await chargerJSON(`${BASE}`, { retries: 0, timeoutMs: 6000 }); } catch {}
-
-    let data;
-    try {
-      data = await chargerJSON(`${BASE}/artists`, { retries: 2, timeoutMs: 12000 });
-    } catch (e1) {
-      if (BASE !== "https://groupietrackers.herokuapp.com/api") {
-        BASE = "https://groupietrackers.herokuapp.com/api";
-        data = await chargerJSON(`${BASE}/artists`, { retries: 2, timeoutMs: 12000 });
-      } else {
-        throw e1;
-      }
-    }
-    etat.artists = Array.isArray(data) ? data : data?.data || [];
-    etat.filtered = etat.artists.slice();
-    console.log("Artistes chargés:", etat.artists.length, "via base", BASE);
-    afficherGrille(etat.filtered);
+    // Fetch combined data from Go backend - all manipulation done server-side
+    const data = await chargerJSON(`${BASE_API}/combined`, { retries: 2, timeoutMs: 12000 });
+    
+    etat.artists = Array.isArray(data) ? data : [];
+    console.log("Artistes chargés depuis Go backend:", etat.artists.length);
+    afficherGrille(etat.artists);
   } catch (e) {
-    afficherErreur(`Erreur de chargement des artistes: ${e.message}. Vérifiez votre connexion ou réessayez.`);
+    afficherErreur(`Erreur de chargement: ${e.message}. Vérifiez que le serveur Go est démarré.`);
     elts.grille.innerHTML = "";
   }
 }
 
-elts.recherche?.addEventListener("input", (e) => appliquerFiltre(e.target.value));
+// Debounce search to avoid hammering the server
+let searchTimeout;
+elts.recherche?.addEventListener("input", (e) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => appliquerFiltre(e.target.value), 300);
+});
 
 elts.grille?.addEventListener('click', (ev) => {
   const t = ev.target;

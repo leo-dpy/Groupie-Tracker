@@ -7,92 +7,92 @@ import (
 	"testing"
 )
 
-func TestCombinedHandler(t *testing.T) {
-	// Create a mock server for the external API
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestGestionnaireCombines(t *testing.T) {
+	// Créer un serveur fictif pour l'API externe
+	serveurMock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/artists" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]Artist{
-				{ID: 1, Name: "Test Band", Members: []string{"Member1", "Member2"}, CreationDate: 2000, FirstAlbum: "01-01-2001"},
+			json.NewEncoder(w).Encode([]Artiste{
+				{ID: 1, Name: "Groupe Test", Members: []string{"Membre1", "Membre2"}, CreationDate: 2000, FirstAlbum: "01-01-2001"},
 			})
 		} else if r.URL.Path == "/api/relation" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(RelationsIndex{
+			json.NewEncoder(w).Encode(IndexRelations{
 				Index: []Relation{
 					{ID: 1, DatesLocations: map[string][]string{"paris-france": {"01-01-2020"}}},
 				},
 			})
 		}
 	}))
-	defer mockServer.Close()
+	defer serveurMock.Close()
 
-	// Test the handler
-	req := httptest.NewRequest("GET", "/api/combined", nil)
+	// Tester le gestionnaire
+	req := httptest.NewRequest("GET", "/api/combines", nil)
 	w := httptest.NewRecorder()
-	combinedHandler(w, req)
+	gestionnaireCombines(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", w.Code)
+		t.Errorf("statut attendu 200, obtenu %d", w.Code)
 	}
 
-	var result []CombinedArtist
-	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
+	var resultat []ArtisteCombine
+	if err := json.NewDecoder(w.Body).Decode(&resultat); err != nil {
+		t.Fatalf("échec du décodage de la réponse : %v", err)
 	}
 
-	if len(result) == 0 {
-		t.Error("expected at least one artist in combined response")
+	if len(resultat) == 0 {
+		t.Error("au moins un artiste attendu dans la réponse combinée")
 	}
 }
 
-func TestSearchHandler(t *testing.T) {
+func TestGestionnaireRecherche(t *testing.T) {
 	tests := []struct {
-		name     string
-		query    string
-		wantCode int
+		nom      string
+		requete  string
+		codeAttendu int
 	}{
-		{"empty query", "", http.StatusOK},
-		{"with query", "test", http.StatusOK},
+		{"requête vide", "", http.StatusOK},
+		{"avec requête", "test", http.StatusOK},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/api/search?q="+tt.query, nil)
+		t.Run(tt.nom, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/recherche?q="+tt.requete, nil)
 			w := httptest.NewRecorder()
-			searchHandler(w, req)
+			gestionnaireRecherche(w, req)
 
-			if w.Code != tt.wantCode {
-				t.Errorf("expected status %d, got %d", tt.wantCode, w.Code)
+			if w.Code != tt.codeAttendu {
+				t.Errorf("statut attendu %d, obtenu %d", tt.codeAttendu, w.Code)
 			}
 
-			var result []CombinedArtist
-			if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
-				t.Fatalf("failed to decode response: %v", err)
+			var resultat []ArtisteCombine
+			if err := json.NewDecoder(w.Body).Decode(&resultat); err != nil {
+				t.Fatalf("échec du décodage de la réponse : %v", err)
 			}
 		})
 	}
 }
 
-func TestArtistByIDHandler(t *testing.T) {
+func TestGestionnaireArtisteParID(t *testing.T) {
 	tests := []struct {
-		name     string
-		path     string
-		wantCode int
+		nom      string
+		chemin   string
+		codeAttendu int
 	}{
-		{"valid id", "/api/artist/1", http.StatusOK},
-		{"missing id", "/api/artist/", http.StatusBadRequest},
+		{"id valide", "/api/artiste/1", http.StatusOK},
+		{"id manquant", "/api/artiste/", http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", tt.path, nil)
+		t.Run(tt.nom, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.chemin, nil)
 			w := httptest.NewRecorder()
-			artistByIDHandler(w, req)
+			gestionnaireArtisteParID(w, req)
 
-			// Note: will likely get BadGateway if external API is down
-			// but we're testing the handler structure
-			if w.Code != tt.wantCode && w.Code != http.StatusBadGateway && w.Code != http.StatusNotFound {
-				t.Logf("got status %d (acceptable for integration test)", w.Code)
+			// Note : on obtiendra probablement BadGateway si l'API externe est hors ligne
+			// mais on teste la structure du gestionnaire
+			if w.Code != tt.codeAttendu && w.Code != http.StatusBadGateway && w.Code != http.StatusNotFound {
+				t.Logf("statut obtenu %d (acceptable pour test d'intégration)", w.Code)
 			}
 		})
 	}

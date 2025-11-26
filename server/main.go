@@ -14,11 +14,11 @@ import (
 	"time"
 )
 
-const remoteBase = "https://groupietrackers.herokuapp.com/api"
-const ytBase = "https://www.googleapis.com/youtube/v3"
+const baseDistante = "https://groupietrackers.herokuapp.com/api"
+const baseYT = "https://www.googleapis.com/youtube/v3"
 
-// Data models
-type Artist struct {
+// Modèles de données
+type Artiste struct {
 	ID           int      `json:"id"`
 	Image        string   `json:"image"`
 	Name         string   `json:"name"`
@@ -30,13 +30,13 @@ type Artist struct {
 	Relations    string   `json:"relations"`
 }
 
-type Location struct {
+type Lieu struct {
 	ID        int      `json:"id"`
 	Locations []string `json:"locations"`
 	Dates     string   `json:"dates"`
 }
 
-type DateInfo struct {
+type InfoDate struct {
 	ID    int      `json:"id"`
 	Dates []string `json:"dates"`
 }
@@ -46,41 +46,41 @@ type Relation struct {
 	DatesLocations map[string][]string `json:"datesLocations"`
 }
 
-type RelationsIndex struct {
+type IndexRelations struct {
 	Index []Relation `json:"index"`
 }
 
-type CombinedArtist struct {
-	Artist
-	Shows []Show `json:"shows,omitempty"`
+type ArtisteCombine struct {
+	Artiste
+	Shows []Concert `json:"shows,omitempty"`
 }
 
-type Show struct {
+type Concert struct {
 	Date     string `json:"date"`
 	Location string `json:"location"`
 }
 
-// Simple in-memory cache
+// Cache simple en mémoire
 var (
-	cacheMu sync.Mutex
-	cache   = map[string]cacheEntry{}
-	ttl     = 5 * time.Minute
+	verrouCache sync.Mutex
+	cache       = map[string]entreeCache{}
+	dureeVie    = 5 * time.Minute
 )
 
-type cacheEntry struct {
-	Data      []byte
-	ExpiresAt time.Time
+type entreeCache struct {
+	Donnees   []byte
+	ExpireLe  time.Time
 	Type      string
 }
 
-func getWithCache(url string) (data []byte, ctype string, err error) {
-	cacheMu.Lock()
-	if e, ok := cache[url]; ok && time.Now().Before(e.ExpiresAt) {
-		data, ctype = e.Data, e.Type
-		cacheMu.Unlock()
+func obtenirAvecCache(url string) (donnees []byte, typeContenu string, err error) {
+	verrouCache.Lock()
+	if e, ok := cache[url]; ok && time.Now().Before(e.ExpireLe) {
+		donnees, typeContenu = e.Donnees, e.Type
+		verrouCache.Unlock()
 		return
 	}
-	cacheMu.Unlock()
+	verrouCache.Unlock()
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -91,212 +91,212 @@ func getWithCache(url string) (data []byte, ctype string, err error) {
 	if err != nil {
 		return nil, "", err
 	}
-	ctype = resp.Header.Get("Content-Type")
-	if ctype == "" {
-		ctype = "application/json; charset=utf-8"
+	typeContenu = resp.Header.Get("Content-Type")
+	if typeContenu == "" {
+		typeContenu = "application/json; charset=utf-8"
 	}
 
-	// Do not cache error responses (>=400)
+	// Ne pas mettre en cache les réponses d'erreur (>=400)
 	if resp.StatusCode >= 400 {
-		return nil, ctype, &httpError{StatusCode: resp.StatusCode, Message: string(b)}
+		return nil, typeContenu, &erreurHTTP{CodeStatut: resp.StatusCode, Message: string(b)}
 	}
 
-	cacheMu.Lock()
-	cache[url] = cacheEntry{Data: b, ExpiresAt: time.Now().Add(ttl), Type: ctype}
-	cacheMu.Unlock()
-	return b, ctype, nil
+	verrouCache.Lock()
+	cache[url] = entreeCache{Donnees: b, ExpireLe: time.Now().Add(dureeVie), Type: typeContenu}
+	verrouCache.Unlock()
+	return b, typeContenu, nil
 }
 
-type httpError struct {
-	StatusCode int
+type erreurHTTP struct {
+	CodeStatut int
 	Message    string
 }
 
-func (e *httpError) Error() string { return e.Message }
+func (e *erreurHTTP) Error() string { return e.Message }
 
-// Fetch and parse JSON from external API
-func fetchAndParse(endpoint string, v interface{}) error {
-	url := remoteBase + endpoint
-	b, _, err := getWithCache(url)
+// Récupérer et analyser le JSON depuis l'API externe
+func recupererEtParser(endpoint string, v interface{}) error {
+	url := baseDistante + endpoint
+	b, _, err := obtenirAvecCache(url)
 	if err != nil {
 		return err
 	}
 	return json.Unmarshal(b, v)
 }
 
-// Get all data and combine
-func getCombinedData() ([]CombinedArtist, error) {
-	var artists []Artist
-	var relationsData RelationsIndex
+// Obtenir toutes les données et les combiner
+func obtenirDonneesCombinees() ([]ArtisteCombine, error) {
+	var artistes []Artiste
+	var donneesRelations IndexRelations
 
-	// Fetch artists and relations in parallel
+	// Récupérer les artistes et les relations en parallèle
 	var wg sync.WaitGroup
-	var errArtists, errRelations error
+	var errArtistes, errRelations error
 
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		errArtists = fetchAndParse("/artists", &artists)
+		errArtistes = recupererEtParser("/artists", &artistes)
 	}()
 	go func() {
 		defer wg.Done()
-		errRelations = fetchAndParse("/relation", &relationsData)
+		errRelations = recupererEtParser("/relation", &donneesRelations)
 	}()
 	wg.Wait()
 
-	if errArtists != nil {
-		return nil, fmt.Errorf("failed to fetch artists: %w", errArtists)
+	if errArtistes != nil {
+		return nil, fmt.Errorf("échec de la récupération des artistes : %w", errArtistes)
 	}
 	if errRelations != nil {
-		return nil, fmt.Errorf("failed to fetch relations: %w", errRelations)
+		return nil, fmt.Errorf("échec de la récupération des relations : %w", errRelations)
 	}
 
-	// Build a map of artist ID to shows
-	relationMap := make(map[int][]Show)
-	for _, rel := range relationsData.Index {
-		var shows []Show
-		for location, dates := range rel.DatesLocations {
+	// Construire une carte d'ID d'artiste vers les concerts
+	carteRelations := make(map[int][]Concert)
+	for _, rel := range donneesRelations.Index {
+		var concerts []Concert
+		for lieu, dates := range rel.DatesLocations {
 			for _, date := range dates {
-				shows = append(shows, Show{
+				concerts = append(concerts, Concert{
 					Date:     date,
-					Location: location,
+					Location: lieu,
 				})
 			}
 		}
-		relationMap[rel.ID] = shows
+		carteRelations[rel.ID] = concerts
 	}
 
-	// Combine artists with their shows
-	combined := make([]CombinedArtist, len(artists))
-	for i, artist := range artists {
-		combined[i] = CombinedArtist{
-			Artist: artist,
-			Shows:  relationMap[artist.ID],
+	// Combiner les artistes avec leurs concerts
+	combines := make([]ArtisteCombine, len(artistes))
+	for i, artiste := range artistes {
+		combines[i] = ArtisteCombine{
+			Artiste: artiste,
+			Shows:   carteRelations[artiste.ID],
 		}
 	}
 
-	return combined, nil
+	return combines, nil
 }
 
-// Handler for /api/combined - returns enriched artist data
-func combinedHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := getCombinedData()
+// Gestionnaire pour /api/combines - renvoie les données enrichies des artistes
+func gestionnaireCombines(w http.ResponseWriter, r *http.Request) {
+	donnees, err := obtenirDonneesCombinees()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(data)
+	json.NewEncoder(w).Encode(donnees)
 }
 
-// Handler for /api/search?q=term - server-side filtering
-func searchHandler(w http.ResponseWriter, r *http.Request) {
-	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+// Gestionnaire pour /api/recherche?q=terme - filtrage côté serveur
+func gestionnaireRecherche(w http.ResponseWriter, r *http.Request) {
+	requete := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
 
-	data, err := getCombinedData()
+	donnees, err := obtenirDonneesCombinees()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 
-	// If no query, return all
-	if query == "" {
+	// Si pas de requête, tout renvoyer
+	if requete == "" {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		json.NewEncoder(w).Encode(data)
+		json.NewEncoder(w).Encode(donnees)
 		return
 	}
 
-	// Filter by name or members
-	var filtered []CombinedArtist
-	for _, artist := range data {
-		if strings.Contains(strings.ToLower(artist.Name), query) {
-			filtered = append(filtered, artist)
+	// Filtrer par nom ou membres
+	var filtrés []ArtisteCombine
+	for _, artiste := range donnees {
+		if strings.Contains(strings.ToLower(artiste.Name), requete) {
+			filtrés = append(filtrés, artiste)
 			continue
 		}
-		for _, member := range artist.Members {
-			if strings.Contains(strings.ToLower(member), query) {
-				filtered = append(filtered, artist)
+		for _, membre := range artiste.Members {
+			if strings.Contains(strings.ToLower(membre), requete) {
+				filtrés = append(filtrés, artiste)
 				break
 			}
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(filtered)
+	json.NewEncoder(w).Encode(filtrés)
 }
 
-// Handler for /api/artist/:id - get single artist with shows
-func artistByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/artist/")
+// Gestionnaire pour /api/artiste/:id - obtenir un seul artiste avec ses concerts
+func gestionnaireArtisteParID(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/artiste/")
 	if idStr == "" {
-		http.Error(w, "artist ID required", http.StatusBadRequest)
+		http.Error(w, "ID d'artiste requis", http.StatusBadRequest)
 		return
 	}
 
-	data, err := getCombinedData()
+	donnees, err := obtenirDonneesCombinees()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 
-	// Find artist by ID (simple string match)
-	for _, artist := range data {
-		if fmt.Sprint(artist.ID) == idStr {
+	// Trouver l'artiste par ID (correspondance de chaîne simple)
+	for _, artiste := range donnees {
+		if fmt.Sprint(artiste.ID) == idStr {
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			json.NewEncoder(w).Encode(artist)
+			json.NewEncoder(w).Encode(artiste)
 			return
 		}
 	}
 
-	http.Error(w, "artist not found", http.StatusNotFound)
+	http.Error(w, "artiste non trouvé", http.StatusNotFound)
 }
 
-// Legacy proxy for backwards compatibility (kept minimal)
-func apiProxy(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/api")
-	if path == "" || path == "/" {
-		b, ctype, err := getWithCache(remoteBase)
+// Proxy hérité pour la rétrocompatibilité (gardé minimal)
+func proxyAPI(w http.ResponseWriter, r *http.Request) {
+	chemin := strings.TrimPrefix(r.URL.Path, "/api")
+	if chemin == "" || chemin == "/" {
+		b, typeContenu, err := obtenirAvecCache(baseDistante)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Content-Type", typeContenu)
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
 		return
 	}
 
-	url := remoteBase + path
-	b, ctype, err := getWithCache(url)
+	url := baseDistante + chemin
+	b, typeContenu, err := obtenirAvecCache(url)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Content-Type", typeContenu)
 	w.WriteHeader(http.StatusOK)
 	w.Write(b)
 }
 
-func ytProxy(w http.ResponseWriter, r *http.Request) {
-	key := os.Getenv("YT_API_KEY")
-	if key == "" {
-		key = os.Getenv("YOUTUBE_API_KEY") // Also check YOUTUBE_API_KEY
+func proxyYT(w http.ResponseWriter, r *http.Request) {
+	cle := os.Getenv("YT_API_KEY")
+	if cle == "" {
+		cle = os.Getenv("YOUTUBE_API_KEY") // Vérifier aussi YOUTUBE_API_KEY
 	}
-	if key == "" {
-		http.Error(w, "YouTube API key missing. Set YT_API_KEY or YOUTUBE_API_KEY env var.", http.StatusServiceUnavailable)
+	if cle == "" {
+		http.Error(w, "Clé API YouTube manquante. Définissez la variable d'env YT_API_KEY ou YOUTUBE_API_KEY.", http.StatusServiceUnavailable)
 		return
 	}
-	path := strings.TrimPrefix(r.URL.Path, "/yt")
-	if path == "" || path == "/" {
+	chemin := strings.TrimPrefix(r.URL.Path, "/yt")
+	if chemin == "" || chemin == "/" {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"endpoints":"/yt/search"}`))
 		return
 	}
-	// /search passthrough
-	if strings.HasPrefix(path, "/search") {
-		u, _ := url.Parse(ytBase + "/search")
+	// Passage /search
+	if strings.HasPrefix(chemin, "/search") {
+		u, _ := url.Parse(baseYT + "/search")
 		q := u.Query()
 		for k, vals := range r.URL.Query() {
 			for _, v := range vals {
@@ -312,7 +312,7 @@ func ytProxy(w http.ResponseWriter, r *http.Request) {
 		if q.Get("maxResults") == "" {
 			q.Set("maxResults", "3")
 		}
-		q.Set("key", key)
+		q.Set("key", cle)
 		u.RawQuery = q.Encode()
 
 		req, err := http.NewRequest("GET", u.String(), nil)
@@ -337,19 +337,19 @@ func ytProxy(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, string(b), resp.StatusCode)
 			return
 		}
-		ctype := resp.Header.Get("Content-Type")
-		if ctype == "" {
-			ctype = "application/json; charset=utf-8"
+		typeContenu := resp.Header.Get("Content-Type")
+		if typeContenu == "" {
+			typeContenu = "application/json; charset=utf-8"
 		}
-		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Content-Type", typeContenu)
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
 		return
 	}
 
-	// /videos passthrough
-	if strings.HasPrefix(path, "/videos") {
-		u, _ := url.Parse(ytBase + "/videos")
+	// Passage /videos
+	if strings.HasPrefix(chemin, "/videos") {
+		u, _ := url.Parse(baseYT + "/videos")
 		q := u.Query()
 		for k, vals := range r.URL.Query() {
 			for _, v := range vals {
@@ -359,7 +359,7 @@ func ytProxy(w http.ResponseWriter, r *http.Request) {
 		if q.Get("part") == "" {
 			q.Set("part", "snippet,contentDetails")
 		}
-		q.Set("key", key)
+		q.Set("key", cle)
 		u.RawQuery = q.Encode()
 
 		req, err := http.NewRequest("GET", u.String(), nil)
@@ -384,11 +384,11 @@ func ytProxy(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, string(b), resp.StatusCode)
 			return
 		}
-		ctype := resp.Header.Get("Content-Type")
-		if ctype == "" {
-			ctype = "application/json; charset=utf-8"
+		typeContenu := resp.Header.Get("Content-Type")
+		if typeContenu == "" {
+			typeContenu = "application/json; charset=utf-8"
 		}
-		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Content-Type", typeContenu)
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
 		return
@@ -396,62 +396,62 @@ func ytProxy(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func withLogging(next http.Handler) http.Handler {
+func avecJournalisation(suivant http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
+		debut := time.Now()
+		suivant.ServeHTTP(w, r)
+		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(debut))
 	})
 }
 
 func main() {
 	mux := http.NewServeMux()
 
-	// New Go-powered endpoints with data manipulation
-	mux.HandleFunc("/api/combined", combinedHandler)
-	mux.HandleFunc("/api/search", searchHandler)
-	mux.HandleFunc("/api/artist/", artistByIDHandler)
+	// Nouveaux points de terminaison propulsés par Go avec manipulation de données
+	mux.HandleFunc("/api/combines", gestionnaireCombines)
+	mux.HandleFunc("/api/recherche", gestionnaireRecherche)
+	mux.HandleFunc("/api/artiste/", gestionnaireArtisteParID)
 
-	// Legacy proxy (for raw access if needed)
-	mux.HandleFunc("/api/artists", apiProxy)
-	mux.HandleFunc("/api/locations", apiProxy)
-	mux.HandleFunc("/api/dates", apiProxy)
-	mux.HandleFunc("/api/relation", apiProxy)
-	mux.HandleFunc("/api", apiProxy)
-	mux.HandleFunc("/api/", apiProxy)
+	// Proxy hérité (pour accès brut si nécessaire)
+	mux.HandleFunc("/api/artists", proxyAPI)
+	mux.HandleFunc("/api/locations", proxyAPI)
+	mux.HandleFunc("/api/dates", proxyAPI)
+	mux.HandleFunc("/api/relation", proxyAPI)
+	mux.HandleFunc("/api", proxyAPI)
+	mux.HandleFunc("/api/", proxyAPI)
 
-	// YouTube proxy
-	mux.HandleFunc("/yt", ytProxy)
-	mux.HandleFunc("/yt/", ytProxy)
+	// Proxy YouTube
+	mux.HandleFunc("/yt", proxyYT)
+	mux.HandleFunc("/yt/", proxyYT)
 
-	// Determine root directory for static files
-	rootDir := "."
+	// Déterminer le répertoire racine pour les fichiers statiques
+	repRacine := "."
 	if _, err := os.Stat("html"); os.IsNotExist(err) {
 		if _, err := os.Stat("../html"); err == nil {
-			rootDir = ".."
+			repRacine = ".."
 		}
 	}
 
-	// Static files from project root
-	fs := http.FileServer(http.Dir(rootDir))
-	// Serve index at root from html/index.html for cleaner URL
+	// Fichiers statiques depuis la racine du projet
+	fs := http.FileServer(http.Dir(repRacine))
+	// Servir l'index à la racine depuis html/index.html pour une URL plus propre
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			fs.ServeHTTP(w, r)
 			return
 		}
-		http.ServeFile(w, r, filepath.Join(rootDir, "html", "index.html"))
+		http.ServeFile(w, r, filepath.Join(repRacine, "html", "index.html"))
 	})
 
-	addr := ":8080"
-	if fromEnv := os.Getenv("PORT"); fromEnv != "" {
-		addr = ":" + fromEnv
+	adresse := ":8080"
+	if depuisEnv := os.Getenv("PORT"); depuisEnv != "" {
+		adresse = ":" + depuisEnv
 	}
 
 	abs, _ := filepath.Abs(".")
-	log.Printf("Serving %s on http://localhost%s", abs, addr)
-	log.Printf("API endpoints: /api/combined, /api/search?q=term, /api/artist/:id")
-	if err := http.ListenAndServe(addr, withLogging(mux)); err != nil {
+	log.Printf("Serveur démarré sur %s à http://localhost%s", abs, adresse)
+	log.Printf("Points de terminaison API : /api/combines, /api/recherche?q=terme, /api/artiste/:id")
+	if err := http.ListenAndServe(adresse, avecJournalisation(mux)); err != nil {
 		log.Fatal(err)
 	}
 }

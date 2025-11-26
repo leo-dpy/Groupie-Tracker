@@ -175,8 +175,8 @@ async function chargerArtiste(id) {
       searchLink.target = "_blank";
       searchLink.rel = "noopener";
       searchLink.className = "etiquette";
-      searchLink.style.display = "inline-block";
-      searchLink.textContent = `🎵 Rechercher "${artiste.name}" sur YouTube`;
+      searchLink.style.display = "inline-flex";
+      searchLink.innerHTML = `<span style="font-size:1.2em; margin-right:8px; line-height:1;">🎵</span><span>Rechercher "${artiste.name}" sur YouTube</span>`;
       searchLinkDiv.appendChild(searchLink);
       ytWrap.appendChild(searchLinkDiv);
       

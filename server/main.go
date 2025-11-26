@@ -424,15 +424,23 @@ func main() {
 	mux.HandleFunc("/yt", ytProxy)
 	mux.HandleFunc("/yt/", ytProxy)
 
+	// Determine root directory for static files
+	rootDir := "."
+	if _, err := os.Stat("html"); os.IsNotExist(err) {
+		if _, err := os.Stat("../html"); err == nil {
+			rootDir = ".."
+		}
+	}
+
 	// Static files from project root
-	fs := http.FileServer(http.Dir("."))
+	fs := http.FileServer(http.Dir(rootDir))
 	// Serve index at root from html/index.html for cleaner URL
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			fs.ServeHTTP(w, r)
 			return
 		}
-		http.ServeFile(w, r, filepath.Join("html", "index.html"))
+		http.ServeFile(w, r, filepath.Join(rootDir, "html", "index.html"))
 	})
 
 	addr := ":8080"

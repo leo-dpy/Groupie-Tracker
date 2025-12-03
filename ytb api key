@@ -1,4 +1,4 @@
-AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4
+HIDDEN_API_KEY
 
 
 
@@ -6,4 +6,4 @@ AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4
 /* Push-Location "c:\Users\leodu\Documents\GitHub\Groupie-Tracker"
 go run .       /*
 
-start server: $env:YT_API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4"; go run .
+start server: $env:YT_API_KEY = "HIDDEN_API_KEY"; go run .

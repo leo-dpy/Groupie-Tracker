@@ -486,7 +486,12 @@ func getVideosForArtist(artistName string) []Video {
 	if respV.StatusCode != 200 {
 		body, _ := io.ReadAll(respV.Body)
 		log.Printf("YT API Error (Videos): %s - %s", respV.Status, string(body))
-		return nil
+		// Fallback: Return mock data so the UI can be tested even if Quota is exceeded
+		return []Video{
+			{ID: "dQw4w9WgXcQ", Title: artistName + " - Top Hit (Demo Mode)"},
+			{ID: "kJQP7kiw5Fk", Title: artistName + " - Live Performance (Demo Mode)"},
+			{ID: "9bZkp7q19f0", Title: artistName + " - Official Video (Demo Mode)"},
+		}
 	}
 
 	var videoRes struct {

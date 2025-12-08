@@ -114,6 +114,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Load YouTube API
   await assurerApiYT();
 
+  const progressIntervals = new Map();
+
   audioItems.forEach((ligne) => {
     const btnPlay = ligne.querySelector(".audio-play");
     const vid = btnPlay.dataset.vid;
@@ -121,12 +123,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     const btnAdd = ligne.querySelector(".btn-add-playlist");
     const btnLike = ligne.querySelector(".btn-like");
     const title = ligne.querySelector(".audio-title").textContent;
+    const progressBar = ligne.querySelector(".audio-progress");
     let player = null;
 
     // Init Like State
     if (btnLike && likes.some((l) => l.id === vid)) {
       btnLike.classList.add("liked");
     }
+
+    const stopProgress = () => {
+      if (progressIntervals.has(vid)) {
+        clearInterval(progressIntervals.get(vid));
+        progressIntervals.delete(vid);
+      }
+    };
+
+    const startProgress = (p) => {
+      stopProgress();
+      const interval = setInterval(() => {
+        if (p && p.getCurrentTime && p.getDuration) {
+          const current = p.getCurrentTime();
+          const total = p.getDuration();
+          if (total > 0) {
+            const pct = (current / total) * 100;
+            if (progressBar) progressBar.style.width = `${pct}%`;
+          }
+        }
+      }, 500);
+      progressIntervals.set(vid, interval);
+    };
 
     // Play Button Logic
     btnPlay.addEventListener("click", () => {
@@ -141,6 +166,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (otherPlayer && otherPlayer.pauseVideo) otherPlayer.pauseVideo();
           const otherBtn = it.querySelector(".audio-play");
           if (otherBtn) otherBtn.textContent = "▶";
+          // Stop other progress
+          if (progressIntervals.has(otherVid)) {
+            clearInterval(progressIntervals.get(otherVid));
+            progressIntervals.delete(otherVid);
+          }
         }
       });
 
@@ -148,9 +178,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         ligne.classList.remove("playing");
         if (player) player.pauseVideo();
         btnPlay.textContent = "▶";
+        stopProgress();
       } else {
         ligne.classList.add("playing");
-        wrapper.style.display = "block";
+        // wrapper.style.display = "block"; // Removed to keep hidden
         if (!player) {
           player = new YT.Player(`player-${vid}`, {
             height: "200",
@@ -158,9 +189,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             videoId: vid,
             events: {
               onStateChange: (e) => {
+                if (e.data === YT.PlayerState.PLAYING) {
+                   startProgress(player);
+                }
+                if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
+                   stopProgress();
+                }
                 if (e.data === YT.PlayerState.ENDED) {
                   ligne.classList.remove("playing");
                   btnPlay.textContent = "▶";
+                  if (progressBar) progressBar.style.width = "0%";
                 }
               },
             },

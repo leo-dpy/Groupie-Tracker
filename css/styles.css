@@ -299,6 +299,15 @@ main {
   border-color: var(--card-hover-border);
 }
 
+.yt-embed-wrapper {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  left: -9999px;
+}
+
 .audio-thumb {
   width: 60px;
   height: 60px;
@@ -747,3 +756,229 @@ main {
     grid-column: 3;
   }
 }
+
+/* --- New Details Page Design --- */
+
+.hero-section {
+  position: relative;
+  height: 400px;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: -60px; /* Overlap with content */
+}
+
+.hero-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(20px) brightness(0.4);
+  transform: scale(1.1);
+  z-index: 1;
+}
+
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent 0%, var(--bg-color) 100%);
+  z-index: 2;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 80px; /* Bottom padding for overlap */
+  display: flex;
+  align-items: flex-end;
+  gap: 32px;
+}
+
+.hero-image {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid var(--bg-color);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.hero-text {
+  flex: 1;
+  margin-bottom: 16px;
+}
+
+.hero-title {
+  font-size: 48px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  background: none;
+  -webkit-text-fill-color: initial;
+  color: #fff;
+}
+
+.hero-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.meta-badge {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 4px;
+}
+
+.meta-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.content-container {
+  position: relative;
+  z-index: 4;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 40px;
+}
+
+.grid-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+.members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.member-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  transition: var(--transition);
+}
+
+.member-card:hover {
+  background: rgba(255,255,255,0.06);
+  transform: translateY(-2px);
+}
+
+.member-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  color: #fff;
+}
+
+.concerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.concert-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255,255,255,0.02);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: var(--transition);
+}
+
+.concert-row:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--card-border);
+}
+
+.concert-loc-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.concert-icon {
+  font-size: 18px;
+}
+
+.concert-loc {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.concert-date {
+  font-family: monospace;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+@media (max-width: 1024px) {
+  .grid-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .hero-section {
+    height: auto;
+    padding-top: 40px;
+    margin-bottom: 0;
+  }
+  
+  .hero-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-bottom: 40px;
+  }
+  
+  .hero-image {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .hero-meta {
+    justify-content: center;
+  }
+}
+

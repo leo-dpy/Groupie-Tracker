@@ -26,77 +26,104 @@
       </div>
     </header>
     <main>
-      <section id="details" class="bloc">
-        <div class="details-flex">
-          <div class="details-img-col">
-            <img src="{{.Image}}" alt="{{.Name}}" class="img-responsive" />
-          </div>
-          <div class="details-info-col">
-            <h2>Informations</h2>
-            <p><strong>Date de création:</strong> {{.CreationDate}}</p>
-            <p><strong>Premier album:</strong> {{.FirstAlbum}}</p>
-
-            <h3>Membres</h3>
-            <ul class="membres-list">
-              {{range .Members}}
-              <li>{{.}}</li>
-              {{end}}
-            </ul>
-          </div>
-        </div>
-
-        <div class="concerts-section">
-          <h3>Concerts</h3>
-          <div class="concerts-grid">
-            {{range .Shows}}
-            <div class="concert-card">
-              <div class="concert-loc">{{.Location}}</div>
-              <div class="concert-date">{{.Date}}</div>
+      <!-- Hero Section -->
+      <div class="hero-section">
+        <div class="hero-bg" style="background-image: url('{{.Image}}')"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <img src="{{.Image}}" alt="{{.Name}}" class="hero-image" />
+          <div class="hero-text">
+            <h1 id="titre-artiste" class="hero-title">{{.Name}}</h1>
+            <div class="hero-meta">
+              <div class="meta-badge">
+                <span class="meta-label">Création</span>
+                <span class="meta-value">{{.CreationDate}}</span>
+              </div>
+              <div class="meta-badge">
+                <span class="meta-label">Premier Album</span>
+                <span class="meta-value">{{.FirstAlbum}}</span>
+              </div>
             </div>
-            {{end}}
           </div>
         </div>
+      </div>
 
-        <div class="youtube-section bloc">
-          <h3>Lecteur audio</h3>
-          <div id="youtube-container">
-            {{if .Videos}} {{range .Videos}}
-            <div class="audio-item">
-              <img
-                class="audio-thumb"
-                alt="{{.Title}}"
-                src="https://i.ytimg.com/vi/{{.ID}}/hqdefault.jpg"
-              />
-              <button class="audio-play" aria-label="Lire" data-vid="{{.ID}}">
-                ▶
-              </button>
-              <div class="audio-meta">
-                <div class="audio-title" title="{{.Title}}">{{.Title}}</div>
-                <div class="audio-bar"><div class="audio-progress"></div></div>
-                <div class="audio-controls">
-                  <button class="btn-like" data-vid="{{.ID}}" title="J'aime">
-                    ❤
-                  </button>
-                  <button
-                    class="btn-add-playlist"
-                    data-vid="{{.ID}}"
-                    data-title="{{.Title}}"
-                    title="Ajouter à la playlist"
-                  >
-                    +
-                  </button>
+      <div class="content-container">
+        <div class="grid-layout">
+          <!-- Left Column: Members & Concerts -->
+          <div class="left-col">
+            <section class="bloc info-section">
+              <h3>Membres</h3>
+              <div class="members-grid">
+                {{range .Members}}
+                <div class="member-card">
+                  <div class="member-avatar">{{slice . 0 1}}</div>
+                  <span>{{.}}</span>
                 </div>
+                {{end}}
               </div>
-              <div class="yt-embed-wrapper" id="yt-wrapper-{{.ID}}">
-                <div id="player-{{.ID}}"></div>
+            </section>
+
+            <section class="bloc concerts-section">
+              <h3>Concerts</h3>
+              <div class="concerts-list">
+                {{range .Shows}}
+                <div class="concert-row">
+                  <div class="concert-loc-wrapper">
+                    <span class="concert-icon">📍</span>
+                    <span class="concert-loc">{{.Location}}</span>
+                  </div>
+                  <div class="concert-date">{{.Date}}</div>
+                </div>
+                {{end}}
               </div>
-            </div>
-            {{end}} {{else}}
-            <p class="texte-gris">Aucune vidéo trouvée.</p>
-            {{end}}
+            </section>
+          </div>
+
+          <!-- Right Column: Audio Player -->
+          <div class="right-col">
+            <section class="bloc youtube-section">
+              <h3>Lecteur Audio</h3>
+              <div id="youtube-container">
+                {{if .Videos}} {{range .Videos}}
+                <div class="audio-item">
+                  <img
+                    class="audio-thumb"
+                    alt="{{.Title}}"
+                    src="https://i.ytimg.com/vi/{{.ID}}/hqdefault.jpg"
+                  />
+                  <button class="audio-play" aria-label="Lire" data-vid="{{.ID}}">
+                    ▶
+                  </button>
+                  <div class="audio-meta">
+                    <div class="audio-title" title="{{.Title}}">{{.Title}}</div>
+                    <div class="audio-bar"><div class="audio-progress"></div></div>
+                    <div class="audio-controls">
+                      <button class="btn-like" data-vid="{{.ID}}" title="J'aime">
+                        ❤
+                      </button>
+                      <button
+                        class="btn-add-playlist"
+                        data-vid="{{.ID}}"
+                        data-title="{{.Title}}"
+                        title="Ajouter à la playlist"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <div class="yt-embed-wrapper" id="yt-wrapper-{{.ID}}">
+                    <div id="player-{{.ID}}"></div>
+                  </div>
+                </div>
+                {{end}} {{else}}
+                <p class="texte-gris">Aucune vidéo trouvée.</p>
+                {{end}}
+              </div>
+            </section>
           </div>
         </div>
-      </section>
+      </div>
 
       <div class="pied-de-page">Données: groupietrackers.herokuapp.com</div>
     </main>

@@ -41,16 +41,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentSongToAdd = null;
 
   const closeModal = () => {
-    modal.classList.add('hidden');
+    modal.classList.add("hidden");
     currentSongToAdd = null;
   };
 
   if (btnCancel) btnCancel.onclick = closeModal;
-  
+
   // Close when clicking outside the modal content
   if (modal) {
     modal.onclick = (e) => {
-        if (e.target === modal) closeModal();
+      if (e.target === modal) closeModal();
     };
   }
 

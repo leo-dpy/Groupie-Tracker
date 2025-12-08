@@ -1,6 +1,6 @@
-HIDDEN_API_KEY
+AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4
 
 
 
 
-/* $port = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue; if ($port) { Stop-Process -Id $port.OwningProcess -Force }; $env:YT_API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4"; go run server/main.go
+$env:YT_API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4"; go run server/main.go

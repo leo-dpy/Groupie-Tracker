@@ -83,3 +83,9 @@ css/styles.css       # Styling
 ✅ **Standard library** - Zero external Go packages  
 ✅ **Unit tests** - `handlers_test.go` included  
 ✅ **Good practices** - Caching, concurrency, logging
+
+## Author
+
+**Léo Dupuy** (@leo-dpy)  
+Email: leo.dupuy@ynov.com
+

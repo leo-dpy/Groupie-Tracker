@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -53,6 +54,12 @@ type IndexRelations struct {
 type ArtisteCombine struct {
 	Artiste
 	Shows []Concert `json:"shows,omitempty"`
+	Videos []Video   `json:"videos,omitempty"`
+}
+
+type Video struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
 }
 
 type Concert struct {
@@ -65,6 +72,7 @@ var (
 	verrouCache sync.Mutex
 	cache       = map[string]entreeCache{}
 	dureeVie    = 5 * time.Minute
+	templates   *template.Template
 )
 
 type entreeCache struct {
@@ -399,6 +407,116 @@ func proxyYT(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+func getVideosForArtist(artistName string) []Video {
+	apiKey := os.Getenv("YT_API_KEY")
+	if apiKey == "" {
+		log.Println("YT_API_KEY missing")
+		return nil
+	}
+
+	// 1. Search for channel/artist
+	query := url.QueryEscape(artistName + " official")
+	searchURL := fmt.Sprintf("%s/search?q=%s&type=channel&maxResults=1&part=snippet&key=%s", baseYT, query, apiKey)
+	
+	log.Printf("Fetching Channel: %s", searchURL) // DEBUG
+
+	req, err := http.NewRequest("GET", searchURL, nil)
+	if err != nil {
+		log.Printf("NewRequest Error: %v", err)
+		return nil
+	}
+	req.Header.Set("Referer", "http://localhost:8080/")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("YT Search Error: %v", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("YT API Error (Channel): %s - %s", resp.Status, string(body))
+		// Fallback to keyword search immediately if channel search fails (e.g. 403 quota or 404)
+	}
+
+	var searchRes struct {
+		Items []struct {
+			ID struct {
+				ChannelID string `json:"channelId"`
+			} `json:"id"`
+		} `json:"items"`
+	}
+	// Decode even if error to avoid crash, but items will be empty
+	_ = json.NewDecoder(resp.Body).Decode(&searchRes)
+
+	var channelID string
+	if len(searchRes.Items) > 0 {
+		channelID = searchRes.Items[0].ID.ChannelID
+		log.Printf("Found Channel ID: %s", channelID)
+	} else {
+		log.Printf("No Channel ID found for %s", artistName)
+	}
+
+	// 2. Search for videos (by channel if found, else by keyword)
+	var videoURL string
+	if channelID != "" {
+		videoURL = fmt.Sprintf("%s/search?channelId=%s&type=video&videoEmbeddable=true&order=viewCount&maxResults=5&part=snippet&key=%s", baseYT, channelID, apiKey)
+	} else {
+		q2 := url.QueryEscape(artistName + " official audio")
+		videoURL = fmt.Sprintf("%s/search?q=%s&type=video&videoEmbeddable=true&maxResults=5&part=snippet&key=%s", baseYT, q2, apiKey)
+	}
+
+	log.Printf("Fetching Videos: %s", videoURL) // DEBUG
+	
+	reqV, err := http.NewRequest("GET", videoURL, nil)
+	if err != nil {
+		return nil
+	}
+	reqV.Header.Set("Referer", "http://localhost:8080/")
+
+	respV, err := client.Do(reqV)
+	if err != nil {
+		log.Printf("YT Video Fetch Error: %v", err)
+		return nil
+	}
+	defer respV.Body.Close()
+
+	if respV.StatusCode != 200 {
+		body, _ := io.ReadAll(respV.Body)
+		log.Printf("YT API Error (Videos): %s - %s", respV.Status, string(body))
+		return nil
+	}
+
+	var videoRes struct {
+		Items []struct {
+			ID struct {
+				VideoID string `json:"videoId"`
+			} `json:"id"`
+			Snippet struct {
+				Title string `json:"title"`
+			} `json:"snippet"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(respV.Body).Decode(&videoRes); err != nil {
+		log.Printf("JSON Decode Error: %v", err)
+		return nil
+	}
+
+	var videos []Video
+	for _, item := range videoRes.Items {
+		if item.ID.VideoID != "" {
+			videos = append(videos, Video{
+				ID:    item.ID.VideoID,
+				Title: item.Snippet.Title,
+			})
+		}
+	}
+	log.Printf("Found %d videos for %s", len(videos), artistName)
+	return videos
+}
+
 func avecJournalisation(suivant http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		debut := time.Now()
@@ -407,10 +525,120 @@ func avecJournalisation(suivant http.Handler) http.Handler {
 	})
 }
 
+// --- SSR HANDLERS ---
+
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	donnees, err := obtenirDonneesCombinees()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	if err := templates.ExecuteTemplate(w, "index.html", donnees); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func searchPageHandler(w http.ResponseWriter, r *http.Request) {
+	requete := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	donnees, err := obtenirDonneesCombinees()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	var resultats []ArtisteCombine
+	if requete == "" {
+		resultats = donnees
+	} else {
+		for _, artiste := range donnees {
+			if strings.Contains(strings.ToLower(artiste.Name), requete) {
+				resultats = append(resultats, artiste)
+				continue
+			}
+			for _, membre := range artiste.Members {
+				if strings.Contains(strings.ToLower(membre), requete) {
+					resultats = append(resultats, artiste)
+					break
+				}
+			}
+			// Add more filters if needed (creation date, first album, etc.)
+			if strings.Contains(fmt.Sprint(artiste.CreationDate), requete) {
+				resultats = append(resultats, artiste)
+				continue
+			}
+			if strings.Contains(strings.ToLower(artiste.FirstAlbum), requete) {
+				resultats = append(resultats, artiste)
+				continue
+			}
+		}
+	}
+	
+	if err := templates.ExecuteTemplate(w, "index.html", resultats); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func artistPageHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		// Try path parsing if query param missing
+		idStr = strings.TrimPrefix(r.URL.Path, "/artist/")
+	}
+
+	donnees, err := obtenirDonneesCombinees()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	for _, artiste := range donnees {
+		if fmt.Sprint(artiste.ID) == idStr {
+			// Fetch videos server-side
+			artiste.Videos = getVideosForArtist(artiste.Name)
+
+			if err := templates.ExecuteTemplate(w, "details.html", artiste); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+	}
+	http.NotFound(w, r)
+}
+
 func main() {
+	// Déterminer le répertoire racine pour les fichiers statiques et templates
+	repRacine := "."
+	if _, err := os.Stat("html"); os.IsNotExist(err) {
+		if _, err := os.Stat("../html"); err == nil {
+			repRacine = ".."
+		}
+	}
+
+	// Parse templates
+	var err error
+	templates, err = template.ParseGlob(filepath.Join(repRacine, "html", "*.html"))
+	if err != nil {
+		log.Fatalf("Erreur parsing templates: %v", err)
+	}
+
 	mux := http.NewServeMux()
 
-	// Nouveaux points de terminaison propulsés par Go avec manipulation de données
+	// SSR Endpoints
+	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/search", searchPageHandler)
+	mux.HandleFunc("/artist", artistPageHandler)
+	mux.HandleFunc("/artist/", artistPageHandler)
+	mux.HandleFunc("/library", func(w http.ResponseWriter, r *http.Request) {
+		if err := templates.ExecuteTemplate(w, "library.html", nil); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	// API Endpoints (kept for bonus features/JS)
 	mux.HandleFunc("/api/combines", gestionnaireCombines)
 	mux.HandleFunc("/api/combined", gestionnaireCombines) // English endpoint
 	mux.HandleFunc("/api/recherche", gestionnaireRecherche)
@@ -430,24 +658,11 @@ func main() {
 	mux.HandleFunc("/yt", proxyYT)
 	mux.HandleFunc("/yt/", proxyYT)
 
-	// Déterminer le répertoire racine pour les fichiers statiques
-	repRacine := "."
-	if _, err := os.Stat("html"); os.IsNotExist(err) {
-		if _, err := os.Stat("../html"); err == nil {
-			repRacine = ".."
-		}
-	}
-
-	// Fichiers statiques depuis la racine du projet
+	// Fichiers statiques (CSS, JS, Images)
 	fs := http.FileServer(http.Dir(repRacine))
-	// Servir l'index à la racine depuis html/index.html pour une URL plus propre
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			fs.ServeHTTP(w, r)
-			return
-		}
-		http.ServeFile(w, r, filepath.Join(repRacine, "html", "index.html"))
-	})
+	mux.Handle("/css/", fs)
+	mux.Handle("/js/", fs)
+	mux.Handle("/image/", fs)
 
 	adresse := ":8080"
 	if depuisEnv := os.Getenv("PORT"); depuisEnv != "" {
@@ -456,7 +671,7 @@ func main() {
 
 	abs, _ := filepath.Abs(".")
 	log.Printf("Serveur démarré sur %s à http://localhost%s", abs, adresse)
-	log.Printf("Points de terminaison API : /api/combines, /api/recherche?q=terme, /api/artiste/:id")
+	log.Printf("Mode SSR activé. Templates chargés.")
 	if err := http.ListenAndServe(adresse, avecJournalisation(mux)); err != nil {
 		log.Fatal(err)
 	}

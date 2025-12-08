@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
@@ -13,20 +13,42 @@
         <h1>Groupie-Tracker</h1>
         <nav class="bandeau" aria-label="Navigation principale">
           <a class="btn" href="/">Menu</a>
-          <button class="btn" id="btn-biblio" type="button">Bibliothèque</button>
-          <input id="nav-search" class="search-input" type="search" placeholder="Rechercher un artiste…" />
+          <a class="btn" href="/library">Bibliothèque</a>
+          <form action="/search" method="GET" style="display: inline-block">
+            <input
+              name="q"
+              class="search-input"
+              type="search"
+              placeholder="Rechercher un artiste…"
+            />
+          </form>
         </nav>
       </div>
     </header>
 
     <main>
-      <section class="grille" id="grille" aria-live="polite"></section>
-
-      <div id="erreur" class="erreur" style="display:none"></div>
+      <section class="grille" id="grille" aria-live="polite">
+        {{if not .}}
+        <p class="texte-gris">Aucun artiste trouvé.</p>
+        {{else}} {{range .}}
+        <div class="carte" tabindex="0">
+          <a
+            href="/artist?id={{.ID}}"
+            style="text-decoration: none; color: inherit; display: block"
+          >
+            <img loading="lazy" alt="{{.Name}}" src="{{.Image}}" />
+            <div class="contenu">
+              <div class="titre">{{.Name}}</div>
+              <div class="texte-gris">
+                Créé: {{.CreationDate}} • 1er album: {{.FirstAlbum}}
+              </div>
+            </div>
+          </a>
+        </div>
+        {{end}} {{end}}
+      </section>
 
       <div class="pied-de-page">Données: groupietrackers.herokuapp.com</div>
     </main>
-
-    <script src="/js/app.js" defer></script>
   </body>
 </html>

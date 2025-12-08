@@ -299,7 +299,7 @@ func gestionnaireArtisteParID(w http.ResponseWriter, r *http.Request) {
 }
 
 // Proxy hérité pour la rétrocompatibilité (gardé minimal)
-func proxyAPI(w http.ResponseWriter, r *http.Request) {
+func proxyVersAPI(w http.ResponseWriter, r *http.Request) {
 	chemin := strings.TrimPrefix(r.URL.Path, "/api")
 	if chemin == "" || chemin == "/" {
 		b, typeContenu, err := obtenirAvecCache(baseDistante)
@@ -324,7 +324,7 @@ func proxyAPI(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
-func proxyYT(w http.ResponseWriter, r *http.Request) {
+func proxyVersYouTube(w http.ResponseWriter, r *http.Request) {
 	cle := os.Getenv("YT_API_KEY")
 	if cle == "" {
 		cle = os.Getenv("YOUTUBE_API_KEY") // Vérifier aussi YOUTUBE_API_KEY
@@ -442,22 +442,24 @@ func proxyYT(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func getVideosForArtist(artistName string) []Video {
-	apiKey := os.Getenv("YT_API_KEY")
-	if apiKey == "" {
-		log.Println("YT_API_KEY missing")
+// obtenirVideosPourArtiste récupère les vidéos YouTube pour un artiste donné.
+// Tente d'abord de trouver la chaîne officielle, puis cherche les vidéos.
+func obtenirVideosPourArtiste(nomArtiste string) []Video {
+	cleAPI := os.Getenv("YT_API_KEY")
+	if cleAPI == "" {
+		log.Println("YT_API_KEY manquante")
 		return nil
 	}
 
-	// 1. Search for channel/artist
-	query := url.QueryEscape(artistName + " official")
-	searchURL := fmt.Sprintf("%s/search?q=%s&type=channel&maxResults=1&part=snippet&key=%s", baseYT, query, apiKey)
+	// 1. Recherche de la chaîne/artiste
+	requete := url.QueryEscape(nomArtiste + " official")
+	urlRecherche := fmt.Sprintf("%s/search?q=%s&type=channel&maxResults=1&part=snippet&key=%s", baseYT, requete, cleAPI)
 	
-	log.Printf("Fetching Channel: %s", searchURL) // DEBUG
+	log.Printf("Récupération Chaîne: %s", urlRecherche)
 
-	req, err := http.NewRequest("GET", searchURL, nil)
+	req, err := http.NewRequest("GET", urlRecherche, nil)
 	if err != nil {
-		log.Printf("NewRequest Error: %v", err)
+		log.Printf("Erreur NewRequest: %v", err)
 		return nil
 	}
 	req.Header.Set("Referer", "http://localhost:8080/")
@@ -465,47 +467,45 @@ func getVideosForArtist(artistName string) []Video {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("YT Search Error: %v", err)
+		log.Printf("Erreur Recherche YT: %v", err)
 		return nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		log.Printf("YT API Error (Channel): %s - %s", resp.Status, string(body))
-		// Fallback to keyword search immediately if channel search fails (e.g. 403 quota or 404)
+		corps, _ := io.ReadAll(resp.Body)
+		log.Printf("Erreur API YT (Chaîne): %s - %s", resp.Status, string(corps))
 	}
 
-	var searchRes struct {
+	var resRecherche struct {
 		Items []struct {
 			ID struct {
 				ChannelID string `json:"channelId"`
 			} `json:"id"`
 		} `json:"items"`
 	}
-	// Decode even if error to avoid crash, but items will be empty
-	_ = json.NewDecoder(resp.Body).Decode(&searchRes)
+	_ = json.NewDecoder(resp.Body).Decode(&resRecherche)
 
-	var channelID string
-	if len(searchRes.Items) > 0 {
-		channelID = searchRes.Items[0].ID.ChannelID
-		log.Printf("Found Channel ID: %s", channelID)
+	var idChaine string
+	if len(resRecherche.Items) > 0 {
+		idChaine = resRecherche.Items[0].ID.ChannelID
+		log.Printf("ID Chaîne trouvé: %s", idChaine)
 	} else {
-		log.Printf("No Channel ID found for %s", artistName)
+		log.Printf("Aucun ID de chaîne trouvé pour %s", nomArtiste)
 	}
 
-	// 2. Search for videos (by channel if found, else by keyword)
-	var videoURL string
-	if channelID != "" {
-		videoURL = fmt.Sprintf("%s/search?channelId=%s&type=video&videoEmbeddable=true&order=viewCount&maxResults=5&part=snippet&key=%s", baseYT, channelID, apiKey)
+	// 2. Recherche des vidéos
+	var urlVideo string
+	if idChaine != "" {
+		urlVideo = fmt.Sprintf("%s/search?channelId=%s&type=video&videoEmbeddable=true&order=viewCount&maxResults=5&part=snippet&key=%s", baseYT, idChaine, cleAPI)
 	} else {
-		q2 := url.QueryEscape(artistName + " official audio")
-		videoURL = fmt.Sprintf("%s/search?q=%s&type=video&videoEmbeddable=true&maxResults=5&part=snippet&key=%s", baseYT, q2, apiKey)
+		q2 := url.QueryEscape(nomArtiste + " official audio")
+		urlVideo = fmt.Sprintf("%s/search?q=%s&type=video&videoEmbeddable=true&maxResults=5&part=snippet&key=%s", baseYT, q2, cleAPI)
 	}
 
-	log.Printf("Fetching Videos: %s", videoURL) // DEBUG
+	log.Printf("Récupération Vidéos: %s", urlVideo)
 	
-	reqV, err := http.NewRequest("GET", videoURL, nil)
+	reqV, err := http.NewRequest("GET", urlVideo, nil)
 	if err != nil {
 		return nil
 	}
@@ -513,23 +513,23 @@ func getVideosForArtist(artistName string) []Video {
 
 	respV, err := client.Do(reqV)
 	if err != nil {
-		log.Printf("YT Video Fetch Error: %v", err)
+		log.Printf("Erreur Récupération Vidéo YT: %v", err)
 		return nil
 	}
 	defer respV.Body.Close()
 
 	if respV.StatusCode != 200 {
-		body, _ := io.ReadAll(respV.Body)
-		log.Printf("YT API Error (Videos): %s - %s", respV.Status, string(body))
-		// Fallback: Return mock data so the UI can be tested even if Quota is exceeded
+		corps, _ := io.ReadAll(respV.Body)
+		log.Printf("Erreur API YT (Vidéos): %s - %s", respV.Status, string(corps))
+		// Repli : Retourner des données factices pour tester l'interface
 		return []Video{
-			{ID: "dQw4w9WgXcQ", Title: artistName + " - Top Hit (Demo Mode)"},
-			{ID: "kJQP7kiw5Fk", Title: artistName + " - Live Performance (Demo Mode)"},
-			{ID: "9bZkp7q19f0", Title: artistName + " - Official Video (Demo Mode)"},
+			{ID: "dQw4w9WgXcQ", Title: nomArtiste + " - Top Hit (Mode Démo)"},
+			{ID: "kJQP7kiw5Fk", Title: nomArtiste + " - Live Performance (Mode Démo)"},
+			{ID: "9bZkp7q19f0", Title: nomArtiste + " - Official Video (Mode Démo)"},
 		}
 	}
 
-	var videoRes struct {
+	var resVideo struct {
 		Items []struct {
 			ID struct {
 				VideoID string `json:"videoId"`
@@ -539,13 +539,13 @@ func getVideosForArtist(artistName string) []Video {
 			} `json:"snippet"`
 		} `json:"items"`
 	}
-	if err := json.NewDecoder(respV.Body).Decode(&videoRes); err != nil {
-		log.Printf("JSON Decode Error: %v", err)
+	if err := json.NewDecoder(respV.Body).Decode(&resVideo); err != nil {
+		log.Printf("Erreur Décodage JSON: %v", err)
 		return nil
 	}
 
 	var videos []Video
-	for _, item := range videoRes.Items {
+	for _, item := range resVideo.Items {
 		if item.ID.VideoID != "" {
 			videos = append(videos, Video{
 				ID:    item.ID.VideoID,
@@ -553,7 +553,7 @@ func getVideosForArtist(artistName string) []Video {
 			})
 		}
 	}
-	log.Printf("Found %d videos for %s", len(videos), artistName)
+	log.Printf("Trouvé %d vidéos pour %s", len(videos), nomArtiste)
 	return videos
 }
 
@@ -565,9 +565,10 @@ func avecJournalisation(suivant http.Handler) http.Handler {
 	})
 }
 
-// --- SSR HANDLERS ---
+// --- GESTIONNAIRES SSR ---
 
-func rootHandler(w http.ResponseWriter, r *http.Request) {
+// gestionnaireRacine gère la page d'accueil.
+func gestionnaireRacine(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
@@ -582,7 +583,8 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func searchPageHandler(w http.ResponseWriter, r *http.Request) {
+// gestionnairePageRecherche gère la page de résultats de recherche.
+func gestionnairePageRecherche(w http.ResponseWriter, r *http.Request) {
 	requete := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
 	donnees, err := obtenirDonneesCombinees()
 	if err != nil {
@@ -605,7 +607,7 @@ func searchPageHandler(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
-			// Add more filters if needed (creation date, first album, etc.)
+			// Ajouter d'autres filtres si nécessaire (date de création, premier album, etc.)
 			if strings.Contains(fmt.Sprint(artiste.CreationDate), requete) {
 				resultats = append(resultats, artiste)
 				continue
@@ -622,10 +624,11 @@ func searchPageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func artistPageHandler(w http.ResponseWriter, r *http.Request) {
+// gestionnairePageArtiste gère la page de détails d'un artiste.
+func gestionnairePageArtiste(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
-		// Try path parsing if query param missing
+		// Essayer de parser le chemin si le paramètre de requête est manquant
 		idStr = strings.TrimPrefix(r.URL.Path, "/artist/")
 	}
 
@@ -637,8 +640,8 @@ func artistPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, artiste := range donnees {
 		if fmt.Sprint(artiste.ID) == idStr {
-			// Fetch videos server-side
-			artiste.Videos = getVideosForArtist(artiste.Name)
+			// Récupérer les vidéos côté serveur
+			artiste.Videos = obtenirVideosPourArtiste(artiste.Name)
 
 			if err := templates.ExecuteTemplate(w, "details.html", artiste); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -658,7 +661,7 @@ func main() {
 		}
 	}
 
-	// Parse templates
+	// Parser les templates
 	var err error
 	templates, err = template.ParseGlob(filepath.Join(repRacine, "html", "*.html"))
 	if err != nil {
@@ -667,26 +670,26 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// SSR Endpoints
-	mux.HandleFunc("/", rootHandler)
-	mux.HandleFunc("/search", searchPageHandler)
-	mux.HandleFunc("/artist", artistPageHandler)
-	mux.HandleFunc("/artist/", artistPageHandler)
+	// Endpoints SSR
+	mux.HandleFunc("/", gestionnaireRacine)
+	mux.HandleFunc("/search", gestionnairePageRecherche)
+	mux.HandleFunc("/artist", gestionnairePageArtiste)
+	mux.HandleFunc("/artist/", gestionnairePageArtiste)
 	mux.HandleFunc("/library", func(w http.ResponseWriter, r *http.Request) {
 		if err := templates.ExecuteTemplate(w, "library.html", nil); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
 
-	// API Endpoints (kept for bonus features/JS)
+	// Endpoints API (gardés pour les fonctionnalités bonus/JS)
 	mux.HandleFunc("/api/combines", gestionnaireCombines)
-	mux.HandleFunc("/api/combined", gestionnaireCombines) // English endpoint
+	mux.HandleFunc("/api/combined", gestionnaireCombines) // Endpoint anglais
 	mux.HandleFunc("/api/recherche", gestionnaireRecherche)
-	mux.HandleFunc("/api/search", gestionnaireRecherche) // English endpoint
+	mux.HandleFunc("/api/search", gestionnaireRecherche) // Endpoint anglais
 	mux.HandleFunc("/api/artiste/", gestionnaireArtisteParID)
-	mux.HandleFunc("/api/artist/", gestionnaireArtisteParID) // English endpoint
+	mux.HandleFunc("/api/artist/", gestionnaireArtisteParID) // Endpoint anglais
 
-	// Playlist API
+	// API Playlist
 	mux.HandleFunc("/api/playlists", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method == "GET" {
@@ -709,7 +712,7 @@ func main() {
 
 	mux.HandleFunc("/api/playlists/add", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "Méthode non autorisée", http.StatusMethodNotAllowed)
 			return
 		}
 		var req struct {
@@ -725,10 +728,10 @@ func main() {
 		defer verrouPlaylist.Unlock()
 		for i := range playlists {
 			if playlists[i].ID == req.PlaylistID {
-				// Check duplicate
+				// Vérifier les doublons
 				for _, s := range playlists[i].Songs {
 					if s.ID == req.Song.ID {
-						http.Error(w, "Song already in playlist", http.StatusConflict)
+						http.Error(w, "Chanson déjà dans la playlist", http.StatusConflict)
 						return
 					}
 				}
@@ -737,12 +740,12 @@ func main() {
 				return
 			}
 		}
-		http.Error(w, "Playlist not found", http.StatusNotFound)
+		http.Error(w, "Playlist non trouvée", http.StatusNotFound)
 	})
 
 	mux.HandleFunc("/api/playlists/remove", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "Méthode non autorisée", http.StatusMethodNotAllowed)
 			return
 		}
 		var req struct {
@@ -769,12 +772,12 @@ func main() {
 				return
 			}
 		}
-		http.Error(w, "Playlist not found", http.StatusNotFound)
+		http.Error(w, "Playlist non trouvée", http.StatusNotFound)
 	})
 
 	mux.HandleFunc("/api/playlists/delete", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "Méthode non autorisée", http.StatusMethodNotAllowed)
 			return
 		}
 		var req struct {
@@ -799,7 +802,7 @@ func main() {
 
 	mux.HandleFunc("/api/playlists/rename", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "Méthode non autorisée", http.StatusMethodNotAllowed)
 			return
 		}
 		var req struct {
@@ -820,20 +823,20 @@ func main() {
 				return
 			}
 		}
-		http.Error(w, "Playlist not found", http.StatusNotFound)
+		http.Error(w, "Playlist non trouvée", http.StatusNotFound)
 	})
 
 	// Proxy hérité (pour accès brut si nécessaire)
-	mux.HandleFunc("/api/artists", proxyAPI)
-	mux.HandleFunc("/api/locations", proxyAPI)
-	mux.HandleFunc("/api/dates", proxyAPI)
-	mux.HandleFunc("/api/relation", proxyAPI)
-	mux.HandleFunc("/api", proxyAPI)
-	mux.HandleFunc("/api/", proxyAPI)
+	mux.HandleFunc("/api/artists", proxyVersAPI)
+	mux.HandleFunc("/api/locations", proxyVersAPI)
+	mux.HandleFunc("/api/dates", proxyVersAPI)
+	mux.HandleFunc("/api/relation", proxyVersAPI)
+	mux.HandleFunc("/api", proxyVersAPI)
+	mux.HandleFunc("/api/", proxyVersAPI)
 
 	// Proxy YouTube
-	mux.HandleFunc("/yt", proxyYT)
-	mux.HandleFunc("/yt/", proxyYT)
+	mux.HandleFunc("/yt", proxyVersYouTube)
+	mux.HandleFunc("/yt/", proxyVersYouTube)
 
 	// Fichiers statiques (CSS, JS, Images)
 	fs := http.FileServer(http.Dir(repRacine))

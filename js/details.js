@@ -1,7 +1,16 @@
+/**
+ * Gestion de la page de détails de l'artiste.
+ * Gère le lecteur audio, les favoris et les playlists.
+ */
+
 let PROMESSE_CHARGEMENT_API_YT = null;
 const lecteursYT = new Map();
 
-function assurerApiYT() {
+/**
+ * Charge l'API YouTube IFrame de manière asynchrone.
+ * @returns {Promise} Une promesse résolue quand l'API est prête.
+ */
+function chargerApiYouTube() {
   if (window.YT && window.YT.Player) return Promise.resolve();
   if (PROMESSE_CHARGEMENT_API_YT) return PROMESSE_CHARGEMENT_API_YT;
   PROMESSE_CHARGEMENT_API_YT = new Promise((resolve) => {
@@ -23,122 +32,140 @@ function assurerApiYT() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const titreArtiste = document.getElementById("titre-artiste")?.textContent;
-  const audioItems = document.querySelectorAll(".audio-item");
+  const elementsAudio = document.querySelectorAll(".audio-item");
 
-  // --- Gestion des Likes et Playlists (Server-Side) ---
-  let likes = JSON.parse(localStorage.getItem("likes") || "[]");
-  // Playlists are now fetched from server
+  // --- Gestion des Favoris et Playlists (Côté Serveur) ---
+  let favoris = JSON.parse(localStorage.getItem("likes") || "[]");
+  // Les playlists sont maintenant récupérées depuis le serveur
   let playlists = [];
 
-  const fetchPlaylists = async () => {
+  /**
+   * Récupère la liste des playlists depuis le serveur.
+   */
+  const recupererPlaylists = async () => {
     try {
       const res = await fetch("/api/playlists");
       if (res.ok) {
         playlists = (await res.json()) || [];
       }
     } catch (e) {
-      console.error("Failed to fetch playlists", e);
+      console.error("Échec de la récupération des playlists", e);
     }
   };
 
-  const saveLikes = () => localStorage.setItem("likes", JSON.stringify(likes));
+  /**
+   * Sauvegarde les favoris dans le stockage local.
+   */
+  const sauvegarderFavoris = () => localStorage.setItem("likes", JSON.stringify(favoris));
 
-  // Modal Elements
-  const modal = document.getElementById("playlist-modal");
-  const modalList = document.getElementById("playlist-list");
-  const btnCreate = document.getElementById("btn-create-new");
-  const btnCancel = document.getElementById("btn-cancel-playlist");
+  // Éléments de la Modale de Sélection
+  const modaleSelection = document.getElementById("playlist-modal");
+  const listePlaylists = document.getElementById("playlist-list");
+  const btnCreerNouvelle = document.getElementById("btn-create-new");
+  const btnAnnulerSelection = document.getElementById("btn-cancel-playlist");
   
-  // Create Modal Elements
-  const createModal = document.getElementById("create-playlist-modal");
-  const inputName = document.getElementById("new-playlist-name");
-  const btnConfirmCreate = document.getElementById("btn-confirm-create");
-  const btnCancelCreate = document.getElementById("btn-cancel-create");
+  // Éléments de la Modale de Création
+  const modaleCreation = document.getElementById("create-playlist-modal");
+  const entreeNomPlaylist = document.getElementById("new-playlist-name");
+  const btnConfirmerCreation = document.getElementById("btn-confirm-create");
+  const btnAnnulerCreation = document.getElementById("btn-cancel-create");
 
-  let currentSongToAdd = null;
+  let chansonEnAttenteAjout = null;
 
-  const closeModal = () => {
-    modal.classList.add("hidden");
-    currentSongToAdd = null;
+  /**
+   * Ferme la modale de sélection de playlist.
+   */
+  const fermerModaleSelection = () => {
+    modaleSelection.classList.add("hidden");
+    chansonEnAttenteAjout = null;
   };
 
-  const closeCreateModal = () => {
-    createModal.classList.add("hidden");
-    inputName.value = "";
+  /**
+   * Ferme la modale de création de playlist.
+   */
+  const fermerModaleCreation = () => {
+    modaleCreation.classList.add("hidden");
+    entreeNomPlaylist.value = "";
   };
 
-  if (btnCancel) btnCancel.onclick = closeModal;
-  if (btnCancelCreate) btnCancelCreate.onclick = closeCreateModal;
+  if (btnAnnulerSelection) btnAnnulerSelection.onclick = fermerModaleSelection;
+  if (btnAnnulerCreation) btnAnnulerCreation.onclick = fermerModaleCreation;
 
-  // Close when clicking outside the modal content
-  if (modal) {
-    modal.onclick = (e) => {
-      if (e.target === modal) closeModal();
+  // Fermer en cliquant en dehors du contenu de la modale
+  if (modaleSelection) {
+    modaleSelection.onclick = (e) => {
+      if (e.target === modaleSelection) fermerModaleSelection();
     };
   }
-  if (createModal) {
-    createModal.onclick = (e) => {
-      if (e.target === createModal) closeCreateModal();
-    };
-  }
-
-  if (btnCreate) {
-    btnCreate.onclick = () => {
-      closeModal(); // Close selection modal
-      createModal.classList.remove("hidden"); // Open create modal
-      inputName.focus();
+  if (modaleCreation) {
+    modaleCreation.onclick = (e) => {
+      if (e.target === modaleCreation) fermerModaleCreation();
     };
   }
 
-  if (btnConfirmCreate) {
-    btnConfirmCreate.onclick = async () => {
-      const name = inputName.value.trim();
-      if (name) {
+  if (btnCreerNouvelle) {
+    btnCreerNouvelle.onclick = () => {
+      fermerModaleSelection(); // Fermer la sélection
+      modaleCreation.classList.remove("hidden"); // Ouvrir la création
+      entreeNomPlaylist.focus();
+    };
+  }
+
+  if (btnConfirmerCreation) {
+    btnConfirmerCreation.onclick = async () => {
+      const nom = entreeNomPlaylist.value.trim();
+      if (nom) {
         try {
-          // Create Playlist on Server
+          // Créer la Playlist sur le Serveur
           const res = await fetch("/api/playlists", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: name, songs: [] }),
+            body: JSON.stringify({ name: nom, songs: [] }),
           });
           
           if (res.ok) {
-            const newPl = await res.json();
-            playlists.push(newPl);
+            const nouvellePl = await res.json();
+            playlists.push(nouvellePl);
             
-            // If we had a song pending, add it now
-            if (currentSongToAdd) {
-              await addToPlaylist(newPl.id, currentSongToAdd);
-              if (window.showToast)
-                window.showToast(`Playlist "${name}" créée et titre ajouté`);
+            // Si nous avions une chanson en attente, l'ajouter maintenant
+            if (chansonEnAttenteAjout) {
+              await ajouterAuPlaylist(nouvellePl.id, chansonEnAttenteAjout);
+              if (window.afficherNotification)
+                window.afficherNotification(`Playlist "${nom}" créée et titre ajouté`);
             } else {
-              if (window.showToast)
-                window.showToast(`Playlist "${name}" créée`);
+              if (window.afficherNotification)
+                window.afficherNotification(`Playlist "${nom}" créée`);
             }
-            closeCreateModal();
+            fermerModaleCreation();
           }
         } catch (e) {
           console.error(e);
-          if (window.showToast) window.showToast("Erreur création playlist", "error");
+          if (window.afficherNotification) window.afficherNotification("Erreur création playlist", "error");
         }
       }
     };
   }
 
-  const addToPlaylist = async (plId, song) => {
+  /**
+   * Ajoute une chanson à une playlist spécifique via l'API.
+   * @param {string} idPlaylist - L'ID de la playlist cible.
+   * @param {object} chanson - L'objet chanson à ajouter.
+   * @returns {boolean} Succès ou échec.
+   */
+  const ajouterAuPlaylist = async (idPlaylist, chanson) => {
     try {
       const res = await fetch("/api/playlists/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playlistId: plId, song: song }),
+        body: JSON.stringify({ playlistId: idPlaylist, song: chanson }),
       });
       if (res.ok) {
-        // Update local cache
-        const idx = playlists.findIndex(p => p.id === plId);
-        if (idx !== -1) playlists[idx].songs.push(song);
+        // Mettre à jour le cache local
+        const idx = playlists.findIndex(p => p.id === idPlaylist);
+        if (idx !== -1) playlists[idx].songs.push(chanson);
         return true;
       } else if (res.status === 409) {
-         if (window.showToast) window.showToast("Déjà dans cette playlist", "error");
+         if (window.afficherNotification) window.afficherNotification("Déjà dans cette playlist", "error");
       }
     } catch (e) {
       console.error(e);
@@ -146,14 +173,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     return false;
   };
 
-  const openPlaylistModal = async (song) => {
-    currentSongToAdd = song;
-    modalList.innerHTML = "Chargement...";
-    await fetchPlaylists(); // Refresh from server
-    modalList.innerHTML = "";
+  /**
+   * Ouvre la modale pour choisir une playlist où ajouter la chanson.
+   * @param {object} chanson - La chanson à ajouter.
+   */
+  const ouvrirModaleSelection = async (chanson) => {
+    chansonEnAttenteAjout = chanson;
+    listePlaylists.innerHTML = "Chargement...";
+    await recupererPlaylists(); // Rafraîchir depuis le serveur
+    listePlaylists.innerHTML = "";
 
     if (playlists.length === 0) {
-      modalList.innerHTML =
+      listePlaylists.innerHTML =
         '<div style="padding:10px;color:#aaa;text-align:center">Aucune playlist. Créez-en une !</div>';
     } else {
       playlists.forEach((pl) => {
@@ -161,143 +192,141 @@ document.addEventListener("DOMContentLoaded", async () => {
         div.className = "playlist-option";
         div.innerHTML = `<span>${pl.name}</span> <span class="count">${pl.songs ? pl.songs.length : 0}</span>`;
         div.onclick = async () => {
-          const success = await addToPlaylist(pl.id, song);
-          if (success && window.showToast) window.showToast(`Ajouté à "${pl.name}"`);
-          closeModal();
+          const succes = await ajouterAuPlaylist(pl.id, chanson);
+          if (succes && window.afficherNotification) window.afficherNotification(`Ajouté à "${pl.name}"`);
+          fermerModaleSelection();
         };
-        modalList.appendChild(div);
+        listePlaylists.appendChild(div);
       });
     }
-    modal.classList.remove("hidden");
+    modaleSelection.classList.remove("hidden");
   };
 
-  if (audioItems.length === 0) return;
+  if (elementsAudio.length === 0) return;
 
-  // Load YouTube API
-  await assurerApiYT();
+  // Charger l'API YouTube
+  await chargerApiYouTube();
 
-  const progressIntervals = new Map();
+  const intervallesProgression = new Map();
 
-  audioItems.forEach((ligne) => {
-    const btnPlay = ligne.querySelector(".audio-play");
-    const vid = btnPlay.dataset.vid;
-    const wrapper = ligne.querySelector(".yt-embed-wrapper");
-    const btnAdd = ligne.querySelector(".btn-add-playlist");
+  elementsAudio.forEach((ligne) => {
+    const btnLecture = ligne.querySelector(".audio-play");
+    const vid = btnLecture.dataset.vid;
+    const btnAjout = ligne.querySelector(".btn-add-playlist");
     const btnLike = ligne.querySelector(".btn-like");
-    const title = ligne.querySelector(".audio-title").textContent;
-    const progressBar = ligne.querySelector(".audio-progress");
-    let player = null;
+    const titre = ligne.querySelector(".audio-title").textContent;
+    const barreProgression = ligne.querySelector(".audio-progress");
+    let lecteur = null;
 
-    // Init Like State
-    if (btnLike && likes.some((l) => l.id === vid)) {
+    // Initialiser l'état "Aimé"
+    if (btnLike && favoris.some((l) => l.id === vid)) {
       btnLike.classList.add("liked");
     }
 
-    const stopProgress = () => {
-      if (progressIntervals.has(vid)) {
-        clearInterval(progressIntervals.get(vid));
-        progressIntervals.delete(vid);
+    const arreterSuiviProgression = () => {
+      if (intervallesProgression.has(vid)) {
+        clearInterval(intervallesProgression.get(vid));
+        intervallesProgression.delete(vid);
       }
     };
 
-    const startProgress = (p) => {
-      stopProgress();
+    const demarrerSuiviProgression = (p) => {
+      arreterSuiviProgression();
       const interval = setInterval(() => {
         if (p && p.getCurrentTime && p.getDuration) {
-          const current = p.getCurrentTime();
+          const actuel = p.getCurrentTime();
           const total = p.getDuration();
           if (total > 0) {
-            const pct = (current / total) * 100;
-            if (progressBar) progressBar.style.width = `${pct}%`;
+            const pct = (actuel / total) * 100;
+            if (barreProgression) barreProgression.style.width = `${pct}%`;
           }
         }
       }, 500);
-      progressIntervals.set(vid, interval);
+      intervallesProgression.set(vid, interval);
     };
 
-    // Play Button Logic
-    btnPlay.addEventListener("click", () => {
-      const isPlaying = ligne.classList.contains("playing");
+    // Logique du Bouton Lecture
+    btnLecture.addEventListener("click", () => {
+      const enLecture = ligne.classList.contains("playing");
 
-      // Pause all others
+      // Mettre en pause tous les autres
       document.querySelectorAll(".audio-item.playing").forEach((it) => {
         if (it !== ligne) {
           it.classList.remove("playing");
-          const otherVid = it.querySelector(".audio-play").dataset.vid;
-          const otherPlayer = lecteursYT.get(otherVid);
-          if (otherPlayer && otherPlayer.pauseVideo) otherPlayer.pauseVideo();
-          const otherBtn = it.querySelector(".audio-play");
-          if (otherBtn) otherBtn.textContent = "▶";
-          // Stop other progress
-          if (progressIntervals.has(otherVid)) {
-            clearInterval(progressIntervals.get(otherVid));
-            progressIntervals.delete(otherVid);
+          const autreVid = it.querySelector(".audio-play").dataset.vid;
+          const autreLecteur = lecteursYT.get(autreVid);
+          if (autreLecteur && autreLecteur.pauseVideo) autreLecteur.pauseVideo();
+          const autreBtn = it.querySelector(".audio-play");
+          if (autreBtn) autreBtn.textContent = "▶";
+          // Arrêter l'autre progression
+          if (intervallesProgression.has(autreVid)) {
+            clearInterval(intervallesProgression.get(autreVid));
+            intervallesProgression.delete(autreVid);
           }
         }
       });
 
-      if (isPlaying) {
+      if (enLecture) {
         ligne.classList.remove("playing");
-        if (player) player.pauseVideo();
-        btnPlay.textContent = "▶";
-        stopProgress();
+        if (lecteur) lecteur.pauseVideo();
+        btnLecture.textContent = "▶";
+        arreterSuiviProgression();
       } else {
         ligne.classList.add("playing");
-        // wrapper.style.display = "block"; // Removed to keep hidden
-        if (!player) {
-          player = new YT.Player(`player-${vid}`, {
+        if (!lecteur) {
+          lecteur = new YT.Player(`player-${vid}`, {
             height: "200",
             width: "100%",
             videoId: vid,
             events: {
               onStateChange: (e) => {
                 if (e.data === YT.PlayerState.PLAYING) {
-                   startProgress(player);
+                   demarrerSuiviProgression(lecteur);
                 }
                 if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
-                   stopProgress();
+                   arreterSuiviProgression();
                 }
                 if (e.data === YT.PlayerState.ENDED) {
                   ligne.classList.remove("playing");
-                  btnPlay.textContent = "▶";
-                  if (progressBar) progressBar.style.width = "0%";
+                  btnLecture.textContent = "▶";
+                  if (barreProgression) barreProgression.style.width = "0%";
                 }
               },
             },
           });
-          lecteursYT.set(vid, player);
+          lecteursYT.set(vid, lecteur);
         }
-        player.playVideo();
-        btnPlay.textContent = "⏸";
+        lecteur.playVideo();
+        btnLecture.textContent = "⏸";
       }
     });
 
-    // Like Button Logic
+    // Logique du Bouton J'aime
     if (btnLike) {
       btnLike.addEventListener("click", (e) => {
         e.stopPropagation();
         btnLike.classList.toggle("liked");
-        const isLiked = btnLike.classList.contains("liked");
+        const estAime = btnLike.classList.contains("liked");
 
-        if (isLiked) {
-          if (!likes.some((l) => l.id === vid)) {
-            likes.push({ id: vid, title: title, artist: titreArtiste });
-            saveLikes();
+        if (estAime) {
+          if (!favoris.some((l) => l.id === vid)) {
+            favoris.push({ id: vid, title: titre, artist: titreArtiste });
+            sauvegarderFavoris();
           }
-          if (window.showToast) window.showToast("Ajouté aux favoris");
+          if (window.afficherNotification) window.afficherNotification("Ajouté aux favoris");
         } else {
-          likes = likes.filter((l) => l.id !== vid);
-          saveLikes();
-          if (window.showToast) window.showToast("Retiré des favoris");
+          favoris = favoris.filter((l) => l.id !== vid);
+          sauvegarderFavoris();
+          if (window.afficherNotification) window.afficherNotification("Retiré des favoris");
         }
       });
     }
 
-    // Add to Playlist Logic
-    if (btnAdd) {
-      btnAdd.addEventListener("click", (e) => {
+    // Logique d'Ajout à la Playlist
+    if (btnAjout) {
+      btnAjout.addEventListener("click", (e) => {
         e.stopPropagation();
-        openPlaylistModal({ id: vid, title: title, artist: titreArtiste });
+        ouvrirModaleSelection({ id: vid, title: titre, artist: titreArtiste });
       });
     }
   });

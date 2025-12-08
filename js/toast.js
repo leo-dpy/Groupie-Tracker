@@ -1,23 +1,30 @@
-function afficherToast(message, type = 'success', surConfirmation = null) {
-    // Supprimer les toasts existants pour éviter l'empilement
+/**
+ * Affiche une notification temporaire à l'écran.
+ * @param {string} message - Le texte à afficher.
+ * @param {string} type - Le type de notification ('success' ou 'error').
+ * @param {function} surConfirmation - Fonction de rappel optionnelle lors de la fermeture manuelle.
+ */
+function afficherNotification(message, type = 'success', surConfirmation = null) {
+    // Supprimer les notifications existantes pour éviter l'empilement
     const existants = document.querySelectorAll('.toast');
     existants.forEach(t => t.remove());
 
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+    const notification = document.createElement('div');
+    notification.className = `toast ${type}`;
     
     const texte = document.createElement('span');
     texte.textContent = message;
-    toast.appendChild(texte);
+    notification.appendChild(texte);
 
-    document.body.appendChild(toast);
+    document.body.appendChild(notification);
 
-    // Déclencher l'animation
+    // Déclencher l'animation d'apparition
     requestAnimationFrame(() => {
-        toast.classList.add('show');
+        notification.classList.add('show');
     });
 
     if (type === 'error') {
+        // Bouton de fermeture pour les erreurs
         const btnFermer = document.createElement('button');
         btnFermer.textContent = 'OK';
         btnFermer.style.marginLeft = '15px';
@@ -30,18 +37,19 @@ function afficherToast(message, type = 'success', surConfirmation = null) {
         btnFermer.style.fontSize = '12px';
         
         btnFermer.onclick = () => {
-            toast.classList.remove('show');
+            notification.classList.remove('show');
             setTimeout(() => {
-                toast.remove();
+                notification.remove();
                 if (surConfirmation) surConfirmation();
             }, 400);
         };
-        toast.appendChild(btnFermer);
+        notification.appendChild(btnFermer);
     } else {
-        // Fermeture automatique pour le succès
+        // Fermeture automatique pour les succès après 3 secondes
         setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 400);
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 400);
         }, 3000);
     }
 }
+

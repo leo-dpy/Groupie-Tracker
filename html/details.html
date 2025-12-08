@@ -151,7 +151,20 @@
       </div>
     </div>
 
-    <script src="/js/toast.js?v=2"></script>
-    <script src="/js/details.js?v=2" defer></script>
+    <!-- Modal Création Playlist -->
+    <div id="create-playlist-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <h3>Nommer la playlist</h3>
+        <input type="text" id="new-playlist-name" class="search-input" placeholder="Mon Super Mix" style="width: 100%; margin-bottom: 16px;">
+        <div class="buttons-row">
+          <button id="btn-confirm-create" class="btn btn-primary">Créer</button>
+          <button id="btn-cancel-create" class="btn btn-secondary">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/js/toast.js?v=3"></script>
+    <script src="/js/details.js?v=3" defer></script>
   </body>
 </html>

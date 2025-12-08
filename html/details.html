@@ -55,11 +55,11 @@
             <section class="bloc info-section">
               <h3>Membres</h3>
               <div class="members-grid">
-                {{range .Members}}
-                <div class="member-card">
-                  <div class="member-avatar">{{slice . 0 1}}</div>
-                  <span>{{.}}</span>
-                </div>
+                {{range .MembersRich}}
+                <a href="{{.WikiURL}}" target="_blank" class="member-card" title="Voir sur Wikipédia">
+                  <div class="member-avatar">{{slice .Name 0 1}}</div>
+                  <span>{{.Name}}</span>
+                </a>
                 {{end}}
               </div>
             </section>
@@ -69,10 +69,10 @@
               <div class="concerts-list">
                 {{range .Shows}}
                 <div class="concert-row">
-                  <div class="concert-loc-wrapper">
+                  <a href="{{.MapURL}}" target="_blank" class="concert-loc-wrapper" title="Voir sur Google Maps">
                     <span class="concert-icon">📍</span>
                     <span class="concert-loc">{{.Location}}</span>
-                  </div>
+                  </a>
                   <div class="concert-date">{{.Date}}</div>
                 </div>
                 {{end}}

@@ -56,10 +56,15 @@
               <h3>Membres</h3>
               <div class="members-grid">
                 {{range .Members}}
-                <div class="member-card">
+                <a
+                  href="https://en.wikipedia.org/wiki/{{.}}"
+                  target="_blank"
+                  class="member-card"
+                  title="Voir sur Wikipedia"
+                >
                   <div class="member-avatar">{{slice . 0 1}}</div>
                   <span>{{.}}</span>
-                </div>
+                </a>
                 {{end}}
               </div>
             </section>
@@ -71,7 +76,14 @@
                 <div class="concert-row">
                   <div class="concert-loc-wrapper">
                     <span class="concert-icon">📍</span>
-                    <span class="concert-loc">{{.Location}}</span>
+                    <a
+                      href="https://www.google.com/maps/search/?api=1&query={{.Location}}"
+                      target="_blank"
+                      class="concert-loc-link"
+                      title="Voir sur Google Maps"
+                    >
+                      <span class="concert-loc">{{.Location}}</span>
+                    </a>
                   </div>
                   <div class="concert-date">{{.Date}}</div>
                 </div>
@@ -92,14 +104,24 @@
                     alt="{{.Title}}"
                     src="https://i.ytimg.com/vi/{{.ID}}/hqdefault.jpg"
                   />
-                  <button class="audio-play" aria-label="Lire" data-vid="{{.ID}}">
+                  <button
+                    class="audio-play"
+                    aria-label="Lire"
+                    data-vid="{{.ID}}"
+                  >
                     ▶
                   </button>
                   <div class="audio-meta">
                     <div class="audio-title" title="{{.Title}}">{{.Title}}</div>
-                    <div class="audio-bar"><div class="audio-progress"></div></div>
+                    <div class="audio-bar">
+                      <div class="audio-progress"></div>
+                    </div>
                     <div class="audio-controls">
-                      <button class="btn-like" data-vid="{{.ID}}" title="J'aime">
+                      <button
+                        class="btn-like"
+                        data-vid="{{.ID}}"
+                        title="J'aime"
+                      >
                         ❤
                       </button>
                       <button

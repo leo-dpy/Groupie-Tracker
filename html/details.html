@@ -26,7 +26,6 @@
       </div>
     </header>
     <main>
-      <!-- Hero Section -->
       <div class="hero-section">
         <div class="hero-bg" style="background-image: url('{{.Image}}')"></div>
         <div class="hero-overlay"></div>
@@ -50,13 +49,17 @@
 
       <div class="content-container">
         <div class="grid-layout">
-          <!-- Left Column: Members & Concerts -->
           <div class="left-col">
             <section class="bloc info-section">
               <h3>Membres</h3>
               <div class="members-grid">
                 {{range .MembersRich}}
-                <a href="{{.WikiURL}}" target="_blank" class="member-card" title="Voir sur Wikipédia">
+                <a
+                  href="{{.WikiURL}}"
+                  target="_blank"
+                  class="member-card"
+                  title="Voir sur Wikipédia"
+                >
                   <div class="member-avatar">{{slice .Name 0 1}}</div>
                   <span>{{.Name}}</span>
                 </a>
@@ -69,7 +72,12 @@
               <div class="concerts-list">
                 {{range .Shows}}
                 <div class="concert-row">
-                  <a href="{{.MapURL}}" target="_blank" class="concert-loc-wrapper" title="Voir sur Google Maps">
+                  <a
+                    href="{{.MapURL}}"
+                    target="_blank"
+                    class="concert-loc-wrapper"
+                    title="Voir sur Google Maps"
+                  >
                     <span class="concert-icon">📍</span>
                     <span class="concert-loc">{{.Location}}</span>
                   </a>
@@ -80,7 +88,6 @@
             </section>
           </div>
 
-          <!-- Right Column: Audio Player -->
           <div class="right-col">
             <section class="bloc youtube-section">
               <h3>Lecteur Audio</h3>
@@ -92,14 +99,24 @@
                     alt="{{.Title}}"
                     src="https://i.ytimg.com/vi/{{.ID}}/hqdefault.jpg"
                   />
-                  <button class="audio-play" aria-label="Lire" data-vid="{{.ID}}">
+                  <button
+                    class="audio-play"
+                    aria-label="Lire"
+                    data-vid="{{.ID}}"
+                  >
                     ▶
                   </button>
                   <div class="audio-meta">
                     <div class="audio-title" title="{{.Title}}">{{.Title}}</div>
-                    <div class="audio-bar"><div class="audio-progress"></div></div>
+                    <div class="audio-bar">
+                      <div class="audio-progress"></div>
+                    </div>
                     <div class="audio-controls">
-                      <button class="btn-like" data-vid="{{.ID}}" title="J'aime">
+                      <button
+                        class="btn-like"
+                        data-vid="{{.ID}}"
+                        title="J'aime"
+                      >
                         ❤
                       </button>
                       <button
@@ -128,14 +145,11 @@
       <div class="pied-de-page">Données: groupietrackers.herokuapp.com</div>
     </main>
 
-    <!-- Modal Choix Playlist -->
     <div id="playlist-modal" class="modal hidden">
       <div class="modal-overlay"></div>
       <div class="modal-content">
         <h3>Ajouter à une playlist</h3>
-        <div id="playlist-list" class="playlist-list">
-          <!-- Playlists injectées ici -->
-        </div>
+        <div id="playlist-list" class="playlist-list"></div>
         <div class="buttons-row">
           <button
             id="btn-create-new"
@@ -151,15 +165,22 @@
       </div>
     </div>
 
-    <!-- Modal Création Playlist -->
     <div id="create-playlist-modal" class="modal hidden">
       <div class="modal-overlay"></div>
       <div class="modal-content">
         <h3>Nommer la playlist</h3>
-        <input type="text" id="new-playlist-name" class="search-input" placeholder="Mon Super Mix" style="width: 100%; margin-bottom: 16px;">
+        <input
+          type="text"
+          id="new-playlist-name"
+          class="search-input"
+          placeholder="Mon Super Mix"
+          style="width: 100%; margin-bottom: 16px"
+        />
         <div class="buttons-row">
           <button id="btn-confirm-create" class="btn btn-primary">Créer</button>
-          <button id="btn-cancel-create" class="btn btn-secondary">Annuler</button>
+          <button id="btn-cancel-create" class="btn btn-secondary">
+            Annuler
+          </button>
         </div>
       </div>
     </div>

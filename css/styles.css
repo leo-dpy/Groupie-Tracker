@@ -707,6 +707,29 @@ main {
   border: 0;
 }
 
+/* Links Styling */
+a.member-card {
+  text-decoration: none;
+  color: inherit;
+  display: flex; /* Restore flex display for card layout */
+}
+
+a.member-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+a.concert-loc-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
+  transition: border-color 0.2s;
+}
+
+a.concert-loc-link:hover {
+  border-bottom-color: #fff;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .contenu-entete {
@@ -810,7 +833,7 @@ main {
   border-radius: 50%;
   object-fit: cover;
   border: 4px solid var(--bg-color);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .hero-text {
@@ -822,7 +845,7 @@ main {
   font-size: 48px;
   font-weight: 800;
   margin-bottom: 16px;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
   background: none;
   -webkit-text-fill-color: initial;
   color: #fff;
@@ -837,18 +860,18 @@ main {
 .meta-badge {
   display: flex;
   flex-direction: column;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   padding: 8px 16px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .meta-label {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: rgba(255,255,255,0.6);
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 4px;
 }
 
@@ -879,7 +902,7 @@ main {
 }
 
 .member-card {
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
   padding: 16px;
@@ -894,9 +917,43 @@ main {
 }
 
 .member-card:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
   transform: translateY(-2px);
-  border-color: rgba(255,255,255,0.2);
+}
+
+.member-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  color: #fff;
+}
+
+.concerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.concert-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: var(--transition);
+}
+
+.concert-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--card-border);
 }
 
 .concert-loc-wrapper {
@@ -925,7 +982,7 @@ main {
 .concert-date {
   font-family: monospace;
   color: var(--text-muted);
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.05);
   padding: 4px 8px;
   border-radius: 4px;
 }
@@ -934,27 +991,26 @@ main {
   .grid-layout {
     grid-template-columns: 1fr;
   }
-  
+
   .hero-section {
     height: auto;
     padding-top: 40px;
     margin-bottom: 0;
   }
-  
+
   .hero-content {
     flex-direction: column;
     align-items: center;
     text-align: center;
     padding-bottom: 40px;
   }
-  
+
   .hero-image {
     width: 160px;
     height: 160px;
   }
-  
+
   .hero-meta {
     justify-content: center;
   }
 }
-

@@ -3,7 +3,4 @@ HIDDEN_API_KEY
 
 
 
-/* Push-Location "c:\Users\leodu\Documents\GitHub\Groupie-Tracker"
-go run .       /*
-
-start server: $env:YT_API_KEY = "HIDDEN_API_KEY"; go run .
+/* $port = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue; if ($port) { Stop-Process -Id $port.OwningProcess -Force }; $env:YT_API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4"; go run server/main.go

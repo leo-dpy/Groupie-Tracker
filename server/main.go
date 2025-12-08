@@ -228,7 +228,10 @@ func gestionnaireRecherche(w http.ResponseWriter, r *http.Request) {
 
 // Gestionnaire pour /api/artiste/:id - obtenir un seul artiste avec ses concerts
 func gestionnaireArtisteParID(w http.ResponseWriter, r *http.Request) {
+	// Support both French and English endpoints
 	idStr := strings.TrimPrefix(r.URL.Path, "/api/artiste/")
+	idStr = strings.TrimPrefix(idStr, "/api/artist/")
+
 	if idStr == "" {
 		http.Error(w, "ID d'artiste requis", http.StatusBadRequest)
 		return
@@ -409,8 +412,11 @@ func main() {
 
 	// Nouveaux points de terminaison propulsés par Go avec manipulation de données
 	mux.HandleFunc("/api/combines", gestionnaireCombines)
+	mux.HandleFunc("/api/combined", gestionnaireCombines) // English endpoint
 	mux.HandleFunc("/api/recherche", gestionnaireRecherche)
+	mux.HandleFunc("/api/search", gestionnaireRecherche) // English endpoint
 	mux.HandleFunc("/api/artiste/", gestionnaireArtisteParID)
+	mux.HandleFunc("/api/artist/", gestionnaireArtisteParID) // English endpoint
 
 	// Proxy hérité (pour accès brut si nécessaire)
 	mux.HandleFunc("/api/artists", proxyAPI)

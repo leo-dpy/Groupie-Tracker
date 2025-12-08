@@ -912,6 +912,8 @@ a.concert-loc-link:hover {
   text-align: center;
   gap: 12px;
   transition: var(--transition);
+  text-decoration: none; /* Remove underline from link */
+  color: var(--text-main);
 }
 
 .member-card:hover {
@@ -958,6 +960,14 @@ a.concert-loc-link:hover {
   display: flex;
   align-items: center;
   gap: 12px;
+  text-decoration: none;
+  color: var(--text-main);
+  transition: color 0.2s;
+}
+
+.concert-loc-wrapper:hover .concert-loc {
+  text-decoration: underline;
+  color: #fff;
 }
 
 .concert-icon {

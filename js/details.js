@@ -25,19 +25,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   const titreArtiste = document.getElementById("titre-artiste")?.textContent;
   const audioItems = document.querySelectorAll(".audio-item");
 
-  // --- Gestion des Likes et Playlists (LocalStorage) ---
+  // --- Gestion des Likes et Playlists (Server-Side) ---
   let likes = JSON.parse(localStorage.getItem("likes") || "[]");
-  let playlists = JSON.parse(localStorage.getItem("playlists") || "[]");
+  // Playlists are now fetched from server
+  let playlists = [];
+
+  const fetchPlaylists = async () => {
+    try {
+      const res = await fetch("/api/playlists");
+      if (res.ok) {
+        playlists = (await res.json()) || [];
+      }
+    } catch (e) {
+      console.error("Failed to fetch playlists", e);
+    }
+  };
 
   const saveLikes = () => localStorage.setItem("likes", JSON.stringify(likes));
-  const savePlaylists = () =>
-    localStorage.setItem("playlists", JSON.stringify(playlists));
 
   // Modal Elements
   const modal = document.getElementById("playlist-modal");
   const modalList = document.getElementById("playlist-list");
   const btnCreate = document.getElementById("btn-create-new");
   const btnCancel = document.getElementById("btn-cancel-playlist");
+  
+  // Create Modal Elements
+  const createModal = document.getElementById("create-playlist-modal");
+  const inputName = document.getElementById("new-playlist-name");
+  const btnConfirmCreate = document.getElementById("btn-confirm-create");
+  const btnCancelCreate = document.getElementById("btn-cancel-create");
+
   let currentSongToAdd = null;
 
   const closeModal = () => {
@@ -45,7 +62,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentSongToAdd = null;
   };
 
+  const closeCreateModal = () => {
+    createModal.classList.add("hidden");
+    inputName.value = "";
+  };
+
   if (btnCancel) btnCancel.onclick = closeModal;
+  if (btnCancelCreate) btnCancelCreate.onclick = closeCreateModal;
 
   // Close when clicking outside the modal content
   if (modal) {
@@ -53,32 +76,81 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (e.target === modal) closeModal();
     };
   }
+  if (createModal) {
+    createModal.onclick = (e) => {
+      if (e.target === createModal) closeCreateModal();
+    };
+  }
 
   if (btnCreate) {
     btnCreate.onclick = () => {
-      const name = prompt("Nom de la nouvelle playlist :");
+      closeModal(); // Close selection modal
+      createModal.classList.remove("hidden"); // Open create modal
+      inputName.focus();
+    };
+  }
+
+  if (btnConfirmCreate) {
+    btnConfirmCreate.onclick = async () => {
+      const name = inputName.value.trim();
       if (name) {
-        const newPl = {
-          id: "pl-" + Date.now(),
-          name: name,
-          songs: [],
-        };
-        if (currentSongToAdd) {
-          newPl.songs.push(currentSongToAdd);
+        try {
+          // Create Playlist on Server
+          const res = await fetch("/api/playlists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name, songs: [] }),
+          });
+          
+          if (res.ok) {
+            const newPl = await res.json();
+            playlists.push(newPl);
+            
+            // If we had a song pending, add it now
+            if (currentSongToAdd) {
+              await addToPlaylist(newPl.id, currentSongToAdd);
+              if (window.showToast)
+                window.showToast(`Playlist "${name}" créée et titre ajouté`);
+            } else {
+              if (window.showToast)
+                window.showToast(`Playlist "${name}" créée`);
+            }
+            closeCreateModal();
+          }
+        } catch (e) {
+          console.error(e);
+          if (window.showToast) window.showToast("Erreur création playlist", "error");
         }
-        playlists.push(newPl);
-        savePlaylists();
-        if (window.showToast)
-          window.showToast(`Playlist "${name}" créée et titre ajouté`);
-        closeModal();
       }
     };
   }
 
-  const openPlaylistModal = (song) => {
+  const addToPlaylist = async (plId, song) => {
+    try {
+      const res = await fetch("/api/playlists/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlistId: plId, song: song }),
+      });
+      if (res.ok) {
+        // Update local cache
+        const idx = playlists.findIndex(p => p.id === plId);
+        if (idx !== -1) playlists[idx].songs.push(song);
+        return true;
+      } else if (res.status === 409) {
+         if (window.showToast) window.showToast("Déjà dans cette playlist", "error");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  };
+
+  const openPlaylistModal = async (song) => {
     currentSongToAdd = song;
+    modalList.innerHTML = "Chargement...";
+    await fetchPlaylists(); // Refresh from server
     modalList.innerHTML = "";
-    playlists = JSON.parse(localStorage.getItem("playlists") || "[]"); // Refresh
 
     if (playlists.length === 0) {
       modalList.innerHTML =
@@ -87,20 +159,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       playlists.forEach((pl) => {
         const div = document.createElement("div");
         div.className = "playlist-option";
-        div.innerHTML = `<span>${pl.name}</span> <span class="count">${pl.songs.length}</span>`;
-        div.onclick = () => {
-          // Check duplicate
-          if (pl.songs.some((s) => s.id === song.id)) {
-            if (window.showToast)
-              window.showToast("Déjà dans cette playlist", "error");
-          } else {
-            pl.songs.push(song);
-            // Update in array
-            const idx = playlists.findIndex((p) => p.id === pl.id);
-            if (idx !== -1) playlists[idx] = pl;
-            savePlaylists();
-            if (window.showToast) window.showToast(`Ajouté à "${pl.name}"`);
-          }
+        div.innerHTML = `<span>${pl.name}</span> <span class="count">${pl.songs ? pl.songs.length : 0}</span>`;
+        div.onclick = async () => {
+          const success = await addToPlaylist(pl.id, song);
+          if (success && window.showToast) window.showToast(`Ajouté à "${pl.name}"`);
           closeModal();
         };
         modalList.appendChild(div);

@@ -55,6 +55,12 @@ type ArtisteCombine struct {
 	Artiste
 	Shows []Concert `json:"shows,omitempty"`
 	Videos []Video   `json:"videos,omitempty"`
+	MembersRich []MemberRich `json:"membersRich,omitempty"`
+}
+
+type MemberRich struct {
+	Name    string `json:"name"`
+	WikiURL string `json:"wikiUrl"`
 }
 
 type Video struct {
@@ -65,7 +71,20 @@ type Video struct {
 type Concert struct {
 	Date     string `json:"date"`
 	Location string `json:"location"`
+	MapURL   string `json:"mapUrl"`
 }
+
+// Playlist System
+type Playlist struct {
+	ID    string  `json:"id"`
+	Name  string  `json:"name"`
+	Songs []Video `json:"songs"`
+}
+
+var (
+	playlists      []Playlist
+	verrouPlaylist sync.Mutex
+)
 
 // Cache simple en mémoire
 var (
@@ -164,10 +183,16 @@ func obtenirDonneesCombinees() ([]ArtisteCombine, error) {
 	for _, rel := range donneesRelations.Index {
 		var concerts []Concert
 		for lieu, dates := range rel.DatesLocations {
+			// Clean location for Google Maps query
+			cleanLoc := strings.ReplaceAll(lieu, "_", " ")
+			cleanLoc = strings.ReplaceAll(cleanLoc, "-", ", ")
+			mapURL := "https://www.google.com/maps/search/?api=1&query=" + url.QueryEscape(cleanLoc)
+
 			for _, date := range dates {
 				concerts = append(concerts, Concert{
 					Date:     date,
 					Location: lieu,
+					MapURL:   mapURL,
 				})
 			}
 		}
@@ -177,9 +202,19 @@ func obtenirDonneesCombinees() ([]ArtisteCombine, error) {
 	// Combiner les artistes avec leurs concerts
 	combines := make([]ArtisteCombine, len(artistes))
 	for i, artiste := range artistes {
+		// Generate Member Links
+		var membersRich []MemberRich
+		for _, m := range artiste.Members {
+			membersRich = append(membersRich, MemberRich{
+				Name:    m,
+				WikiURL: "https://en.wikipedia.org/wiki/" + url.QueryEscape(strings.ReplaceAll(m, " ", "_")),
+			})
+		}
+
 		combines[i] = ArtisteCombine{
-			Artiste: artiste,
-			Shows:   carteRelations[artiste.ID],
+			Artiste:     artiste,
+			Shows:       carteRelations[artiste.ID],
+			MembersRich: membersRich,
 		}
 	}
 
@@ -650,6 +685,143 @@ func main() {
 	mux.HandleFunc("/api/search", gestionnaireRecherche) // English endpoint
 	mux.HandleFunc("/api/artiste/", gestionnaireArtisteParID)
 	mux.HandleFunc("/api/artist/", gestionnaireArtisteParID) // English endpoint
+
+	// Playlist API
+	mux.HandleFunc("/api/playlists", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "GET" {
+			verrouPlaylist.Lock()
+			defer verrouPlaylist.Unlock()
+			json.NewEncoder(w).Encode(playlists)
+		} else if r.Method == "POST" {
+			var p Playlist
+			if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			p.ID = fmt.Sprintf("pl-%d", time.Now().UnixNano())
+			verrouPlaylist.Lock()
+			playlists = append(playlists, p)
+			verrouPlaylist.Unlock()
+			json.NewEncoder(w).Encode(p)
+		}
+	})
+
+	mux.HandleFunc("/api/playlists/add", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			PlaylistID string `json:"playlistId"`
+			Song       Video  `json:"song"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		verrouPlaylist.Lock()
+		defer verrouPlaylist.Unlock()
+		for i := range playlists {
+			if playlists[i].ID == req.PlaylistID {
+				// Check duplicate
+				for _, s := range playlists[i].Songs {
+					if s.ID == req.Song.ID {
+						http.Error(w, "Song already in playlist", http.StatusConflict)
+						return
+					}
+				}
+				playlists[i].Songs = append(playlists[i].Songs, req.Song)
+				json.NewEncoder(w).Encode(playlists[i])
+				return
+			}
+		}
+		http.Error(w, "Playlist not found", http.StatusNotFound)
+	})
+
+	mux.HandleFunc("/api/playlists/remove", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			PlaylistID string `json:"playlistId"`
+			SongID     string `json:"songId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		verrouPlaylist.Lock()
+		defer verrouPlaylist.Unlock()
+		for i := range playlists {
+			if playlists[i].ID == req.PlaylistID {
+				newSongs := []Video{}
+				for _, s := range playlists[i].Songs {
+					if s.ID != req.SongID {
+						newSongs = append(newSongs, s)
+					}
+				}
+				playlists[i].Songs = newSongs
+				json.NewEncoder(w).Encode(playlists[i])
+				return
+			}
+		}
+		http.Error(w, "Playlist not found", http.StatusNotFound)
+	})
+
+	mux.HandleFunc("/api/playlists/delete", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			PlaylistID string `json:"playlistId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		verrouPlaylist.Lock()
+		defer verrouPlaylist.Unlock()
+		newPlaylists := []Playlist{}
+		for _, p := range playlists {
+			if p.ID != req.PlaylistID {
+				newPlaylists = append(newPlaylists, p)
+			}
+		}
+		playlists = newPlaylists
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mux.HandleFunc("/api/playlists/rename", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			PlaylistID string `json:"playlistId"`
+			NewName    string `json:"newName"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		verrouPlaylist.Lock()
+		defer verrouPlaylist.Unlock()
+		for i := range playlists {
+			if playlists[i].ID == req.PlaylistID {
+				playlists[i].Name = req.NewName
+				json.NewEncoder(w).Encode(playlists[i])
+				return
+			}
+		}
+		http.Error(w, "Playlist not found", http.StatusNotFound)
+	})
 
 	// Proxy hérité (pour accès brut si nécessaire)
 	mux.HandleFunc("/api/artists", proxyAPI)

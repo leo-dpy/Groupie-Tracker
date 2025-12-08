@@ -237,14 +237,26 @@ function creerElementLecteur(chanson, conteneur, surSuppression, surFin) {
 
 // État
 let aimes = JSON.parse(localStorage.getItem('likes') || '[]');
-let playlists = JSON.parse(localStorage.getItem('playlists') || '[]');
+let playlists = [];
+
+const fetchPlaylists = async () => {
+    try {
+        const res = await fetch('/api/playlists');
+        if (res.ok) {
+            playlists = await res.json() || [];
+        }
+    } catch (e) {
+        console.error("Erreur chargement playlists", e);
+    }
+};
 
 // Navigation
-elements.btnRetour.addEventListener('click', () => {
+elements.btnRetour.addEventListener('click', async () => {
     elements.vuePlaylist.classList.add('hidden');
     elements.vueBibliotheque.classList.remove('hidden');
     // Arrêter tous les lecteurs
     arreterAutres(null);
+    await fetchPlaylists();
     afficherBibliotheque();
 });
 
@@ -254,16 +266,27 @@ elements.annulerCreation.addEventListener('click', () => {
     elements.entreeCreation.value = '';
 });
 
-elements.confirmerCreation.addEventListener('click', () => {
+elements.confirmerCreation.addEventListener('click', async () => {
     const nom = elements.entreeCreation.value.trim();
     if (nom) {
-        const nouvellePl = { id: Date.now(), name: nom, songs: [] };
-        playlists.push(nouvellePl);
-        localStorage.setItem('playlists', JSON.stringify(playlists));
-        elements.modaleCreation.classList.add('hidden');
-        elements.entreeCreation.value = '';
-        afficherBibliotheque();
-        afficherToast(`Playlist "${nom}" créée`, 'success');
+        try {
+            const res = await fetch('/api/playlists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: nom, songs: [] })
+            });
+            if (res.ok) {
+                const newPl = await res.json();
+                playlists.push(newPl);
+                elements.modaleCreation.classList.add('hidden');
+                elements.entreeCreation.value = '';
+                afficherBibliotheque();
+                afficherToast(`Playlist "${nom}" créée`, 'success');
+            }
+        } catch (e) {
+            console.error(e);
+            afficherToast("Erreur lors de la création", 'error');
+        }
     } else {
         afficherToast("Veuillez entrer un nom de playlist.", 'error');
     }
@@ -401,10 +424,19 @@ function ouvrirVuePlaylist(idPlaylist, lectureAuto = false) {
         btnRenommer.className = 'btn';
         btnRenommer.textContent = 'Renommer';
         btnRenommer.onclick = () => {
-            ouvrirModaleRenommer(pl.name, (nouveauNom) => {
-                pl.name = nouveauNom;
-                localStorage.setItem('playlists', JSON.stringify(playlists));
-                elements.titrePlaylistCourante.textContent = pl.name;
+            ouvrirModaleRenommer(pl.name, async (nouveauNom) => {
+                try {
+                    const res = await fetch('/api/playlists/rename', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playlistId: pl.id, newName: nouveauNom })
+                    });
+                    if (res.ok) {
+                        pl.name = nouveauNom;
+                        elements.titrePlaylistCourante.textContent = pl.name;
+                        afficherToast("Playlist renommée", 'success');
+                    }
+                } catch (e) { console.error(e); }
             });
         };
         elements.actionsPlaylist.appendChild(btnRenommer);
@@ -415,23 +447,37 @@ function ouvrirVuePlaylist(idPlaylist, lectureAuto = false) {
         btnSupprimer.style.color = '#f87171';
         btnSupprimer.textContent = 'Supprimer';
         btnSupprimer.onclick = () => {
-            ouvrirModaleConfirmation('Supprimer la playlist', 'Voulez-vous vraiment supprimer cette playlist ?', () => {
-                playlists = playlists.filter(p => p.id !== pl.id);
-                localStorage.setItem('playlists', JSON.stringify(playlists));
-                elements.btnRetour.click();
-                afficherToast("Playlist supprimée", 'success');
+            ouvrirModaleConfirmation('Supprimer la playlist', 'Voulez-vous vraiment supprimer cette playlist ?', async () => {
+                try {
+                    const res = await fetch('/api/playlists/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playlistId: pl.id })
+                    });
+                    if (res.ok) {
+                        playlists = playlists.filter(p => p.id !== pl.id);
+                        elements.btnRetour.click();
+                        afficherToast("Playlist supprimée", 'success');
+                    }
+                } catch (e) { console.error(e); }
             });
         };
         elements.actionsPlaylist.appendChild(btnSupprimer);
 
         surSuppression = (chanson) => {
-            ouvrirModaleConfirmation('Retirer de la playlist', 'Voulez-vous vraiment retirer ce titre de la playlist ?', () => {
-                pl.songs = pl.songs.filter(s => s.id !== chanson.id);
-                const idx = playlists.findIndex(p => p.id === pl.id);
-                if (idx !== -1) playlists[idx] = pl;
-                localStorage.setItem('playlists', JSON.stringify(playlists));
-                ouvrirVuePlaylist(pl.id); // Rafraîchir
-                afficherToast("Titre retiré de la playlist", 'success');
+            ouvrirModaleConfirmation('Retirer de la playlist', 'Voulez-vous vraiment retirer ce titre de la playlist ?', async () => {
+                try {
+                    const res = await fetch('/api/playlists/remove', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playlistId: pl.id, songId: chanson.id })
+                    });
+                    if (res.ok) {
+                        pl.songs = pl.songs.filter(s => s.id !== chanson.id);
+                        ouvrirVuePlaylist(pl.id); // Rafraîchir
+                        afficherToast("Titre retiré de la playlist", 'success');
+                    }
+                } catch (e) { console.error(e); }
             });
         };
     }
@@ -458,4 +504,7 @@ function ouvrirVuePlaylist(idPlaylist, lectureAuto = false) {
 }
 
 // Rendu initial
-afficherBibliotheque();
+(async () => {
+    await fetchPlaylists();
+    afficherBibliotheque();
+})();

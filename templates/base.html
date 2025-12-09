@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ .Titre }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.svg">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="brand">Groupie<br>Tracker</div>
+        <div class="nav-btn active" data-link="/api/index">INDEX</div>
+        <div class="nav-btn" data-link="/api/biblio">BIBLIOTHEQUE</div>
+        <div style="margin-top:auto; padding:20px; font-size:0.7rem; color:#555;">
+            STATUS: ONLINE
+        </div>
+    </div>
+
+    <div class="main">
+        <div id="toast-container"></div>
+        
+        <div class="search-wrapper">
+            <span style="color:var(--green); margin-right:10px;">></span>
+            <input type="text" id="search-input" class="search-input" placeholder="Rechercher...">
+        </div>
+
+        <div id="content" class="content">
+            {{ template "liste_artistes.html" . }}
+        </div>
+
+        <div class="player">
+            <button id="main-play" class="play-btn" onclick="togglePlay()">></button>
+            <div class="screen">
+                <div id="status">SYSTEME PRET</div>
+                <div id="progress-container" class="progress-container" onclick="seek(event)">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+            <div class="volume-box">
+                <span style="font-size:0.8rem; color:#777">VOL</span>
+                <input type="range" class="vol-slider" id="vol" min="0" max="100" value="100" oninput="setVolume(this.value)">
+            </div>
+            <div id="yt-hidden"></div>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+<div class="section-head">INDEX BASE DE DONNEES</div>
+<div class="grid">
+    {{ range .Artistes }}
+    <div class="card" data-link="/api/detail?id={{ .Id }}">
+        <img src="{{ .Image }}">
+        <div class="card-name">{{ .Nom }}</div>
+    </div>
+    {{ end }}
+</div>

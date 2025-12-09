@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Détails artiste</title>
+    <link rel="icon" type="image/png" href="/image/favicon.png" />
+    <link rel="stylesheet" href="/css/styles.css?v=2" />
+  </head>
+  <body>
+    <header>
+      <div class="contenu-entete">
+        <h1 id="titre-artiste">{{.Name}}</h1>
+        <nav class="bandeau" aria-label="Navigation principale">
+          <a class="btn" href="/">Menu</a>
+          <a class="btn" href="/library">Bibliothèque</a>
+          <form action="/search" method="GET" style="display: inline-block">
+            <input
+              name="q"
+              class="search-input"
+              type="search"
+              placeholder="Rechercher un artiste…"
+            />
+          </form>
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="hero-section">
+        <div class="hero-bg" style="background-image: url('{{.Image}}')"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <img src="{{.Image}}" alt="{{.Name}}" class="hero-image" />
+          <div class="hero-text">
+            <h1 id="titre-artiste" class="hero-title">{{.Name}}</h1>
+            <div class="hero-meta">
+              <div class="meta-badge">
+                <span class="meta-label">Création</span>
+                <span class="meta-value">{{.CreationDate}}</span>
+              </div>
+              <div class="meta-badge">
+                <span class="meta-label">Premier Album</span>
+                <span class="meta-value">{{.FirstAlbum}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-container">
+        <div class="grid-layout">
+          <div class="left-col">
+            <section class="bloc info-section">
+              <h3>Membres</h3>
+              <div class="members-grid">
+                {{range .MembersRich}}
+                <a
+                  href="{{.WikiURL}}"
+                  target="_blank"
+                  class="member-card"
+                  title="Voir sur Wikipédia"
+                >
+                  <div class="member-avatar">{{slice .Name 0 1}}</div>
+                  <span>{{.Name}}</span>
+                </a>
+                {{end}}
+              </div>
+            </section>
+
+            <section class="bloc concerts-section">
+              <h3>Concerts</h3>
+              <div class="concerts-list">
+                {{range .Shows}}
+                <div class="concert-row">
+                  <a
+                    href="{{.MapURL}}"
+                    target="_blank"
+                    class="concert-loc-wrapper"
+                    title="Voir sur Google Maps"
+                  >
+                    <span class="concert-icon">📍</span>
+                    <span class="concert-loc">{{.Location}}</span>
+                  </a>
+                  <div class="concert-date">{{.Date}}</div>
+                </div>
+                {{end}}
+              </div>
+            </section>
+          </div>
+
+          <div class="right-col">
+            <section class="bloc youtube-section">
+              <h3>Lecteur Audio</h3>
+              <div id="youtube-container">
+                {{if .Videos}} {{range .Videos}}
+                <div class="audio-item">
+                  <img
+                    class="audio-thumb"
+                    alt="{{.Title}}"
+                    src="https://i.ytimg.com/vi/{{.ID}}/hqdefault.jpg"
+                  />
+                  <button
+                    class="audio-play"
+                    aria-label="Lire"
+                    data-vid="{{.ID}}"
+                  >
+                    ▶
+                  </button>
+                  <div class="audio-meta">
+                    <div class="audio-title" title="{{.Title}}">{{.Title}}</div>
+                    <div class="audio-bar">
+                      <div class="audio-progress"></div>
+                    </div>
+                    <div class="audio-controls">
+                      <button
+                        class="btn-like"
+                        data-vid="{{.ID}}"
+                        title="J'aime"
+                      >
+                        ❤
+                      </button>
+                      <button
+                        class="btn-add-playlist"
+                        data-vid="{{.ID}}"
+                        data-title="{{.Title}}"
+                        title="Ajouter à la playlist"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <div class="yt-embed-wrapper" id="yt-wrapper-{{.ID}}">
+                    <div id="player-{{.ID}}"></div>
+                  </div>
+                </div>
+                {{end}} {{else}}
+                <p class="texte-gris">Aucune vidéo trouvée.</p>
+                {{end}}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <div class="pied-de-page">Données: groupietrackers.herokuapp.com</div>
+    </main>
+
+    <div id="playlist-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <h3>Ajouter à une playlist</h3>
+        <div id="playlist-list" class="playlist-list"></div>
+        <div class="buttons-row">
+          <button
+            id="btn-create-new"
+            class="btn btn-secondary"
+            style="width: 100%"
+          >
+            + Nouvelle Playlist
+          </button>
+          <button id="btn-cancel-playlist" class="btn btn-secondary">
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="create-playlist-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <h3>Nommer la playlist</h3>
+        <input
+          type="text"
+          id="new-playlist-name"
+          class="search-input"
+          placeholder="Mon Super Mix"
+          style="width: 100%; margin-bottom: 16px"
+        />
+        <div class="buttons-row">
+          <button id="btn-confirm-create" class="btn btn-primary">Créer</button>
+          <button id="btn-cancel-create" class="btn btn-secondary">
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/js/toast.js?v=3"></script>
+    <script src="/js/details.js?v=3" defer></script>
+  </body>
+</html>

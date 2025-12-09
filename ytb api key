@@ -1,6 +1,0 @@
-AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4
-
-
-
-
-Get-Process main -ErrorAction SilentlyContinue | Stop-Process -Force; $env:YT_API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4"; go run server/main.go

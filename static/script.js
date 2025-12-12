@@ -3,8 +3,10 @@ let player;
 let timer;
 let searchTimeout;
 
+// Fonction utilitaire pour sécuriser les chaînes de caractères (évite les undefined/null)
 function safe(str) { return (str === undefined || str === null) ? "Inconnu" : String(str); }
 
+// Initialisation au chargement de la fenêtre
 window.onload = () => {
     if(!sessionStorage.getItem('clean_v17')) {
         sessionStorage.removeItem('myLib');
@@ -25,6 +27,7 @@ window.onload = () => {
     }
 };
 
+// Gestionnaire global des clics pour la navigation SPA (Single Page Application)
 document.addEventListener('click', e => {
     const target = e.target.closest('[data-link]');
     if (target) {
@@ -38,6 +41,7 @@ document.addEventListener('click', e => {
     }
 });
 
+// Fonction de navigation asynchrone pour charger le contenu sans recharger la page
 async function navigate(url) {
     try {
         const res = await fetch(url);
@@ -58,6 +62,7 @@ async function navigate(url) {
     }
 }
 
+// Récupère les pistes audio depuis l'API YouTube pour un artiste donné
 async function fetchTracks(artist) {
     const list = document.getElementById('audio-tracker');
     if(!list || !artist) return;
@@ -86,6 +91,7 @@ async function fetchTracks(artist) {
     } catch(e) { list.innerHTML = "<div style='padding:10px; color:red'>ERREUR RESEAU.</div>"; }
 }
 
+// Affiche la liste des pistes audio dans le DOM
 function renderList(tracks, artist) {
     const list = document.getElementById('audio-tracker');
     let html = "";
@@ -107,6 +113,7 @@ const tag = document.createElement('script');
 tag.src = "https://www.youtube.com/iframe_api";
 document.body.appendChild(tag);
 
+// Callback appelé automatiquement par l'API YouTube IFrame
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('yt-hidden', {
         height: '0', width: '0', playerVars: { playsinline: 1 },
@@ -114,19 +121,24 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
+// Gestionnaire d'événements pour les changements d'état du lecteur YouTube
 function onState(e) {
     const btn = document.getElementById('main-play');
     if(e.data == 1) { btn.innerText = "||"; startTimer(); } else { btn.innerText = ">"; stopTimer(); }
 }
 
+// Lance la lecture d'une vidéo par son ID
 function playID(id, title) {
     document.getElementById('status').innerText = "LECTURE: " + safe(title);
     if(player && player.loadVideoById) { player.loadVideoById(id); const vol = document.getElementById('vol'); if(vol) player.setVolume(vol.value); }
 }
 
+// Bascule entre lecture et pause
 function togglePlay() { if(player) { if(player.getPlayerState() == 1) player.pauseVideo(); else player.playVideo(); } }
+// Règle le volume du lecteur
 function setVolume(v) { if(player) player.setVolume(v); }
 
+// Gère le déplacement dans la barre de progression
 function seek(e) {
     if(!player || !player.getDuration) return;
     const container = document.getElementById('progress-container');
@@ -136,9 +148,12 @@ function seek(e) {
     document.getElementById('progress-fill').style.width = (pct * 100) + "%";
 }
 
+// Démarre le timer pour mettre à jour la barre de progression
 function startTimer() { stopTimer(); timer = setInterval(() => { if(player && player.getCurrentTime) { const pct = (player.getCurrentTime() / player.getDuration()) * 100; const bar = document.getElementById('progress-fill'); if(bar) bar.style.width = pct + "%"; } }, 200); }
+// Arrête le timer de progression
 function stopTimer() { clearInterval(timer); }
 
+// Ajoute une piste à la bibliothèque locale (sessionStorage)
 function addToLib(encodedJson) {
     try {
         const data = JSON.parse(decodeURIComponent(encodedJson));
@@ -150,6 +165,7 @@ function addToLib(encodedJson) {
     } catch(e) { notify("ERREUR AJOUT"); }
 }
 
+// Charge et affiche la bibliothèque depuis le stockage local
 function loadLibrary() {
     const target = document.getElementById('lib-target');
     if(!target) return;
@@ -171,6 +187,7 @@ function loadLibrary() {
     target.innerHTML = html;
 }
 
+// Supprime un élément de la bibliothèque
 function delFromLib(idx) {
     let lib = JSON.parse(sessionStorage.getItem('myLib') || "[]");
     lib.splice(idx, 1);
@@ -179,6 +196,7 @@ function delFromLib(idx) {
     notify("SUPPRIME.");
 }
 
+// Affiche une notification temporaire (toast)
 function notify(msg) {
     const box = document.getElementById('toast-container');
     if(!box) return;

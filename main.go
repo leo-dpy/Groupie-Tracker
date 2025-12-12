@@ -44,8 +44,9 @@ var (
 )
 
 // --- CHARGEMENT ---
+// Récupère les données des artistes et des relations depuis l'API externe de manière asynchrone
 func chargerDonnees() {
-	fmt.Println("⏳ SYSTEME: Chargement des données...")
+	fmt.Println("SYSTEME: Chargement des données...")
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -85,6 +86,7 @@ func chargerDonnees() {
 }
 
 // --- UTILITAIRE DE RENDU ---
+// Charge les templates HTML et injecte les données pour générer la réponse HTTP
 func render(w http.ResponseWriter, tmpl string, data interface{}) {
 	// On parse tous les fichiers à chaque fois pour éviter les erreurs de cache template
 	tpls, err := template.ParseGlob("templates/*.html")
@@ -103,15 +105,18 @@ func render(w http.ResponseWriter, tmpl string, data interface{}) {
 
 // --- ROUTES ---
 
+// Affiche la page d'accueil principale avec la structure de base
 func routeAccueil(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Requête: Accueil")
 	render(w, "base.html", PageDonnees{Titre: "Groupie Tracker V17", Artistes: CacheArtistes})
 }
 
+// Renvoie le fragment HTML de la liste des artistes
 func routeApiIndex(w http.ResponseWriter, r *http.Request) {
 	render(w, "liste_artistes.html", PageDonnees{Artistes: CacheArtistes})
 }
 
+// Renvoie le fragment HTML des détails d'un artiste spécifique
 func routeApiDetail(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, _ := strconv.Atoi(idStr)
@@ -123,10 +128,12 @@ func routeApiDetail(w http.ResponseWriter, r *http.Request) {
 	render(w, "details_artiste.html", PageDonnees{Artiste: MapArtisteID[id], Relations: CacheRelations[id]})
 }
 
+// Renvoie le fragment HTML de la bibliothèque utilisateur
 func routeApiBiblio(w http.ResponseWriter, r *http.Request) {
 	render(w, "bibliotheque.html", nil)
 }
 
+// Gère la recherche d'artistes par nom ou date de création
 func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(r.URL.Query().Get("q"))
 	var res []Artiste
@@ -139,6 +146,7 @@ func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- MAIN (Le point d'entrée corrigé) ---
+// Point d'entrée de l'application : initialise les données, configure les routes et lance le serveur
 func main() {
 	chargerDonnees()
 	
@@ -156,9 +164,9 @@ func main() {
     port := os.Getenv("PORT")
     if port == "" {
         port = "8081" // On force le 8081 pour le portfolio
-        fmt.Println("✅ Mode Local : Démarrage Groupie Tracker sur http://localhost:8081")
+        fmt.Println("Mode Local : Démarrage Groupie Tracker sur http://localhost:8081")
     } else {
-        fmt.Println("🚀 Mode Serveur : Démarrage sur le port :" + port)
+        fmt.Println("Mode Serveur : Démarrage sur le port :" + port)
     }
 
     // 2. LANCEMENT DU SERVEUR

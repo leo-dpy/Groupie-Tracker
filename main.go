@@ -43,7 +43,6 @@ var (
 	MapArtisteID   map[int]Artiste
 )
 
-// --- CHARGEMENT ---
 // Récupère les données des artistes et des relations depuis l'API externe de manière asynchrone
 func chargerDonnees() {
 	fmt.Println("SYSTEME: Chargement des données...")
@@ -85,7 +84,6 @@ func chargerDonnees() {
 	wg.Wait()
 }
 
-// --- UTILITAIRE DE RENDU ---
 // Charge les templates HTML et injecte les données pour générer la réponse HTTP
 func render(w http.ResponseWriter, tmpl string, data interface{}) {
 	// On parse tous les fichiers à chaque fois pour éviter les erreurs de cache template
@@ -103,7 +101,7 @@ func render(w http.ResponseWriter, tmpl string, data interface{}) {
 	}
 }
 
-// --- ROUTES ---
+
 
 // Affiche la page d'accueil principale avec la structure de base
 func routeAccueil(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +143,6 @@ func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 	render(w, "liste_artistes.html", PageDonnees{Artistes: res})
 }
 
-// --- MAIN (Le point d'entrée corrigé) ---
 // Point d'entrée de l'application : initialise les données, configure les routes et lance le serveur
 func main() {
 	chargerDonnees()

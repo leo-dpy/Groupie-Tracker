@@ -1,4 +1,4 @@
-const API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4";
+const API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4"; // clé privée sécurisée google cloud 
 let player;
 let timer;
 let searchTimeout;

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -81,10 +82,9 @@ func chargerDonnees() {
 		}
 	}()
 	wg.Wait()
-	fmt.Println("✅ SYSTEME: Prêt sur http://localhost:8080")
 }
 
-// --- UTILITAIRE DE RENDU (Pour éviter la page blanche) ---
+// --- UTILITAIRE DE RENDU ---
 func render(w http.ResponseWriter, tmpl string, data interface{}) {
 	// On parse tous les fichiers à chaque fois pour éviter les erreurs de cache template
 	tpls, err := template.ParseGlob("templates/*.html")
@@ -138,15 +138,29 @@ func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 	render(w, "liste_artistes.html", PageDonnees{Artistes: res})
 }
 
+// --- MAIN (Le point d'entrée corrigé) ---
 func main() {
 	chargerDonnees()
+	
+	// Gestion fichiers statiques
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 	
+	// Routes
 	http.HandleFunc("/", routeAccueil)
 	http.HandleFunc("/api/index", routeApiIndex)
 	http.HandleFunc("/api/detail", routeApiDetail)
 	http.HandleFunc("/api/biblio", routeApiBiblio)
 	http.HandleFunc("/api/recherche", routeApiRecherche)
 
-	http.ListenAndServe(":8080", nil)
+	// 1. GESTION INTELLIGENTE DU PORT
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8081" // On force le 8081 pour le portfolio
+        fmt.Println("✅ Mode Local : Démarrage Groupie Tracker sur http://localhost:8081")
+    } else {
+        fmt.Println("🚀 Mode Serveur : Démarrage sur le port :" + port)
+    }
+
+    // 2. LANCEMENT DU SERVEUR
+    http.ListenAndServe(":"+port, nil)
 }

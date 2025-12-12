@@ -78,7 +78,11 @@ async function fetchTracks(artist) {
             }));
             sessionStorage.setItem(storageKey, JSON.stringify(tracks));
             renderList(tracks, artist);
-        } else { list.innerHTML = "<div style='padding:10px; color:red'>API LIMITE.</div>"; }
+        } else { 
+            console.error("YouTube API Error:", data);
+            const msg = data.error ? data.error.message : "API LIMITE (No items found)";
+            list.innerHTML = `<div style='padding:10px; color:red'>${msg}</div>`; 
+        }
     } catch(e) { list.innerHTML = "<div style='padding:10px; color:red'>ERREUR RESEAU.</div>"; }
 }
 

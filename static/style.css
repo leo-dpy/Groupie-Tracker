@@ -114,12 +114,7 @@ body {
     width: 100%;
     aspect-ratio: 1;
     object-fit: cover;
-    filter: grayscale(100%);
     display: block;
-}
-
-.card:hover img {
-    filter: grayscale(0);
 }
 
 .card-name {
@@ -156,7 +151,6 @@ body {
 .header img {
     width: 150px;
     height: 150px;
-    filter: grayscale(100%);
     border: 1px solid var(--text);
 }
 
@@ -333,4 +327,30 @@ body {
 .tag:hover {
     background: #333;
     color: white;
+}
+
+/* Style de la barre de défilement */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: black;
+    border: 1px solid var(--border);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #333;
+    border: 1px solid var(--green);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--green);
+}
+
+/* Pour Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #333 black;
 }

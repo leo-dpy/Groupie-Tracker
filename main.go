@@ -131,6 +131,11 @@ func routeApiBiblio(w http.ResponseWriter, r *http.Request) {
 	render(w, "bibliotheque.html", nil)
 }
 
+// Renvoie le fragment HTML de l'onglet YouTube Music
+func routeApiYouTube(w http.ResponseWriter, r *http.Request) {
+	render(w, "youtube_music.html", nil)
+}
+
 // Gère la recherche d'artistes par nom ou date de création
 func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(r.URL.Query().Get("q"))
@@ -155,6 +160,7 @@ func main() {
 	http.HandleFunc("/api/index", routeApiIndex)
 	http.HandleFunc("/api/detail", routeApiDetail)
 	http.HandleFunc("/api/biblio", routeApiBiblio)
+	http.HandleFunc("/api/youtube", routeApiYouTube)
 	http.HandleFunc("/api/recherche", routeApiRecherche)
 
 	// 1. GESTION INTELLIGENTE DU PORT

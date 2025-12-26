@@ -25,6 +25,8 @@ window.onload = () => {
             }, 300);
         });
     }
+    // Initialiser YouTube Music si l'onglet est actif au chargement
+    if(document.getElementById('yt-search-input')) initYouTubeMusic();
 };
 
 // Gestionnaire global des clics pour la navigation SPA (Single Page Application)
@@ -57,6 +59,8 @@ async function navigate(url) {
             if(artist) fetchTracks(artist);
         }
         if(document.getElementById('lib-target')) loadLibrary();
+        // Initialiser YouTube Music si présent dans le contenu chargé
+        if(document.getElementById('yt-search-input')) initYouTubeMusic();
     } catch (err) {
         notify("ERREUR NAV: " + err);
     }
@@ -204,4 +208,75 @@ function notify(msg) {
     div.className = 'toast-msg'; div.innerText = "> " + msg;
     box.appendChild(div);
     setTimeout(() => div.remove(), 3000);
+}
+
+// -----------------
+// YOUTUBE MUSIC TAB
+// -----------------
+
+function initYouTubeMusic() {
+    const input = document.getElementById('yt-search-input');
+    const results = document.getElementById('yt-results');
+    if(!input || !results) return;
+    // Debounced search
+    input.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const val = e.target.value.trim();
+        searchTimeout = setTimeout(() => {
+            if(val.length > 1) ytSearch(val);
+            else {
+                results.innerHTML = "<div style='padding:10px; color:#555'>Entrez une requête ci-dessus.</div>";
+            }
+        }, 300);
+    });
+    // Default suggestion
+    results.innerHTML = "<div style='padding:10px; color:var(--green)'>> Suggéré: Top music</div>";
+    ytSearch('top music official audio');
+}
+
+async function ytSearch(query) {
+    const box = document.getElementById('yt-results');
+    if(!box) return;
+    box.innerHTML = "<div style='padding:10px; color:var(--green); animation:blink 1s infinite;'>> RECHERCHE...</div>";
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&order=viewCount&key=${API_KEY}`;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if(!data.items) {
+            const msg = data.error ? data.error.message : 'Aucun résultat.';
+            box.innerHTML = `<div style='padding:10px; color:red'>${msg}</div>`;
+            return;
+        }
+        renderYTResults(data.items);
+    } catch(e) {
+        box.innerHTML = "<div style='padding:10px; color:red'>ERREUR RESEAU.</div>";
+    }
+}
+
+function renderYTResults(items) {
+    const box = document.getElementById('yt-results');
+    if(!box) return;
+    let html = '';
+    items.forEach(i => {
+        const vid = i.id && i.id.videoId ? i.id.videoId : null;
+        if(!vid) return;
+        const title = safe(i.snippet && i.snippet.title);
+        const channel = safe(i.snippet && i.snippet.channelTitle);
+        const thumb = i.snippet && i.snippet.thumbnails && (i.snippet.thumbnails.medium?.url || i.snippet.thumbnails.default?.url) || '';
+        const dataObj = encodeURIComponent(JSON.stringify({id: vid, title: title, artist: channel}));
+        const jsTitle = title.replace(/'/g, "\\'");
+        html += `
+        <div class="card">
+            <img src="${thumb}" alt="thumb" onclick="playID('${vid}', '${jsTitle}')">
+            <div class="card-name">
+                ${title}
+                <div style="font-size:0.8rem; color:#888">${channel}</div>
+                <div style="margin-top:8px; display:flex; justify-content:center;">
+                    <button class="btn-icon" onclick="playID('${vid}', '${jsTitle}')">></button>
+                    <button class="btn-icon" onclick="addToLib('${dataObj}')">+</button>
+                </div>
+            </div>
+        </div>`;
+    });
+    box.innerHTML = html || "<div style='padding:10px; color:#555'>Aucun résultat.</div>";
 }

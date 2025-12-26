@@ -225,7 +225,7 @@ function initYouTubeMusic() {
         searchTimeout = setTimeout(() => {
             if(val.length > 1) ytSearch(val);
             else {
-                results.innerHTML = "<div style='padding:10px; color:#555'>Entrez une requête ci-dessus.</div>";
+                results.innerHTML = "<div style='padding:10px; color:#555; grid-column: 1 / -1;'>Entrez une requête ci-dessus.</div>";
             }
         }, 300);
     });

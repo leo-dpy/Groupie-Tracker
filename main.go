@@ -106,7 +106,7 @@ func render(w http.ResponseWriter, tmpl string, data interface{}) {
 // Affiche la page d'accueil principale avec la structure de base
 func routeAccueil(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Requête: Accueil")
-	render(w, "base.html", PageDonnees{Titre: "Groupie Tracker V17", Artistes: CacheArtistes})
+	render(w, "base.html", PageDonnees{Titre: "Groupie Tracker", Artistes: CacheArtistes})
 }
 
 // Renvoie le fragment HTML de la liste des artistes

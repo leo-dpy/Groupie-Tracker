@@ -2,7 +2,7 @@
 <div style="margin-bottom:10px; color:#888">Tapez une requête pour chercher des vidéos musicales sur YouTube. Cliquez
     pour lire, ou ajoutez à votre bibliothèque.</div>
 <div style="display:flex; gap:10px; margin-bottom:10px;">
-    <input id="yt-search-input" class="search-input" type="text" placeholder="Rechercher sur YouTube (ex: artist song)">
-    <button class="btn-back" onclick="ytSearch(document.getElementById('yt-search-input').value)">SCAN</button>
+    <input id="yt-search-input" class="search-input" type="text" autocomplete="off" placeholder="Rechercher sur YouTube (ex: artist song)">
+    <button class="btn-back" style="padding: 10px 15px; margin-bottom: 0; font-size: 1rem;" onclick="ytSearch(document.getElementById('yt-search-input').value)">SCAN</button>
 </div>
 <div id="yt-results" class="grid"></div>

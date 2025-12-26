@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <title>{{ .Titre }}</title>
@@ -9,6 +10,7 @@
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.svg">
 </head>
+
 <body>
     <div class="sidebar">
         <div class="brand">Groupie<br>Tracker</div>
@@ -22,7 +24,7 @@
 
     <div class="main">
         <div id="toast-container"></div>
-        
+
         <div class="search-wrapper">
             <span style="color:var(--green); margin-right:10px;">></span>
             <input type="text" id="search-input" class="search-input" placeholder="Rechercher...">
@@ -42,11 +44,13 @@
             </div>
             <div class="volume-box">
                 <span style="font-size:0.8rem; color:#777">VOL</span>
-                <input type="range" class="vol-slider" id="vol" min="0" max="100" value="100" oninput="setVolume(this.value)">
+                <input type="range" class="vol-slider" id="vol" min="0" max="100" value="100"
+                    oninput="setVolume(this.value)">
             </div>
             <div id="yt-hidden"></div>
         </div>
     </div>
     <script src="/static/script.js"></script>
 </body>
+
 </html>

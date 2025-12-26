@@ -1,44 +1,49 @@
 <button class="btn-back" data-link="/api/index">
-    < RETOUR INDEX
-</button>
+    < RETOUR INDEX </button>
 
-<div class="header">
-    <img src="{{ .Artiste.Image }}">
-    <div>
-        <h1>{{ .Artiste.Nom }}</h1>
-        <div style="color:#888; margin-bottom:10px;">
-            Création: {{ .Artiste.DateCreation }} | Album: {{ .Artiste.PremierAlbum }}
-        </div>
-        <div class="tags">
-            {{ range .Artiste.Membres }}
-            <a href="https://fr.wikipedia.org/wiki/{{ . }}" target="_blank" class="tag">{{ . }}</a>
-            {{ end }}
-        </div>
-    </div>
-</div>
-
-<div class="grid" style="grid-template-columns: 1fr 1fr;">
-    <div>
-        <div class="section-head">SCAN AUDIO (YOUTUBE)</div>
-        <div id="audio-tracker" data-artist="{{ .Artiste.Nom }}">
-            <div style="padding:10px; color:var(--green); animation:blink 1s infinite;">> RECHERCHE...</div>
-        </div>
-    </div>
-    
-    <div>
-        <div class="section-head">LOCALISATIONS</div>
-        <div style="max-height:400px; overflow-y:auto; border:1px solid #333;">
-            {{ range $lieu, $dates := .Relations }}
-            <div style="padding:10px; border-bottom:1px solid #222;">
-                <a href="https://maps.google.com/?q={{ $lieu }}" target="_blank" class="map-link">
-                    📍 {{ $lieu }}
-                </a>
-                <div style="font-size:0.8rem; color:#666;">
-                    {{ range $dates }}<span style="margin-right:5px;">{{ . }}</span>{{ end }}
+        <div class="header">
+            <img src="{{ .Artiste.Image }}">
+            <div>
+                <h1>{{ .Artiste.Nom }}</h1>
+                <div style="color:#888; margin-bottom:10px;">
+                    Création: {{ .Artiste.DateCreation }} | Album: {{ .Artiste.PremierAlbum }}
+                </div>
+                <div class="tags">
+                    {{ range .Artiste.Membres }}
+                    <a href="https://fr.wikipedia.org/wiki/{{ . }}" target="_blank" class="tag">{{ . }}</a>
+                    {{ end }}
                 </div>
             </div>
-            {{ end }}
         </div>
-    </div>
-</div>
-<style>@keyframes blink{50%{opacity:0}}</style>
+
+        <div class="grid" style="grid-template-columns: 1fr 1fr;">
+            <div>
+                <div class="section-head">SCAN AUDIO (YOUTUBE)</div>
+                <div id="audio-tracker" data-artist="{{ .Artiste.Nom }}">
+                    <div style="padding:10px; color:var(--green); animation:blink 1s infinite;">> RECHERCHE...</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-head">LOCALISATIONS</div>
+                <div style="max-height:400px; overflow-y:auto; border:1px solid #333;">
+                    {{ range $lieu, $dates := .Relations }}
+                    <div style="padding:10px; border-bottom:1px solid #222;">
+                        <a href="https://maps.google.com/?q={{ $lieu }}" target="_blank" class="map-link">
+                            📍 {{ $lieu }}
+                        </a>
+                        <div style="font-size:0.8rem; color:#666;">
+                            {{ range $dates }}<span style="margin-right:5px;">{{ . }}</span>{{ end }}
+                        </div>
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes blink {
+                50% {
+                    opacity: 0
+                }
+            }
+        </style>

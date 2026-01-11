@@ -87,7 +87,6 @@ func chargerDonnees() {
 
 // Charge les templates HTML et injecte les données pour générer la réponse HTTP
 func render(w http.ResponseWriter, tmpl string, data interface{}) {
-	// On parse tous les fichiers à chaque fois pour éviter les erreurs de cache template
 	tpls, err := template.ParseGlob("templates/*.html")
 	if err != nil {
 		fmt.Println("ERREUR TEMPLATE:", err)
@@ -102,18 +101,18 @@ func render(w http.ResponseWriter, tmpl string, data interface{}) {
 	}
 }
 
-// Affiche la page d'accueil principale avec la structure de base
+// Affiche la page d'accueil principale
 func routeAccueil(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Requête: Accueil")
 	render(w, "base.html", PageDonnees{Titre: "Groupie Tracker", Artistes: CacheArtistes})
 }
 
-// Renvoie le fragment HTML de la liste des artistes
+// Renvoie la liste des artistes
 func routeApiIndex(w http.ResponseWriter, r *http.Request) {
 	render(w, "liste_artistes.html", PageDonnees{Artistes: CacheArtistes})
 }
 
-// Renvoie le fragment HTML des détails d'un artiste spécifique
+// Renvoie les détails d'un artiste
 func routeApiDetail(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, _ := strconv.Atoi(idStr)
@@ -125,17 +124,17 @@ func routeApiDetail(w http.ResponseWriter, r *http.Request) {
 	render(w, "details_artiste.html", PageDonnees{Artiste: MapArtisteID[id], Relations: CacheRelations[id]})
 }
 
-// Renvoie le fragment HTML de la bibliothèque utilisateur
+// Renvoie la bibliothèque utilisateur
 func routeApiBiblio(w http.ResponseWriter, r *http.Request) {
 	render(w, "bibliotheque.html", nil)
 }
 
-// Renvoie le fragment HTML de l'onglet YouTube Music
+// Renvoie l'onglet YouTube Music
 func routeApiYouTube(w http.ResponseWriter, r *http.Request) {
 	render(w, "youtube_music.html", nil)
 }
 
-// Gère la recherche d'artistes par nom ou date de création
+// Gère la recherche d'artistes
 func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(r.URL.Query().Get("q"))
 	var res []Artiste
@@ -147,25 +146,25 @@ func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 	render(w, "liste_artistes.html", PageDonnees{Artistes: res})
 }
 
-// [SECURITE] Proxy pour cacher la clé API YouTube
+// [SECURITE] Proxy YouTube propre (Authentification via IP Serveur)
 func routeApiProxyYouTube(w http.ResponseWriter, r *http.Request) {
-	// 1. Récupérer la clé sécurisée depuis la variable d'environnement spécifiée
+	// 1. Récupération de la clé (Variable Coolify)
 	apiKey := os.Getenv("Clé_API_youtube_data")
 
 	if apiKey == "" {
-		fmt.Println("ATTENTION: La variable d'environnement 'Clé_API_youtube_data' est vide ou introuvable.")
-		http.Error(w, "Erreur configuration serveur : Clé API manquante", 500)
+		fmt.Println("ATTENTION: Variable 'Clé_API_youtube_data' vide.")
+		http.Error(w, "Erreur configuration serveur", 500)
 		return
 	}
 
-	// 2. Récupérer les paramètres envoyés par le JS
+	// 2. Paramètres
 	q := r.URL.Query().Get("q")
 	limit := r.URL.Query().Get("maxResults")
 	if limit == "" {
 		limit = "6"
-	} // Par défaut 6 résultats
+	}
 
-	// 3. Construire l'URL vers Google proprement
+	// 3. Construction URL Google
 	safeQuery := url.QueryEscape(q)
 	googleUrl := fmt.Sprintf(
 		"https://www.googleapis.com/youtube/v3/search?part=snippet&q=%s&type=video&order=viewCount&maxResults=%s&key=%s",
@@ -174,28 +173,25 @@ func routeApiProxyYouTube(w http.ResponseWriter, r *http.Request) {
 		apiKey,
 	)
 
-	// 4. Appel serveur à serveur (Go -> Google)
+	// 4. Appel Simple (L'IP du serveur validera l'accès)
 	resp, err := http.Get(googleUrl)
 	if err != nil {
-		http.Error(w, "Erreur de communication avec YouTube", 500)
+		http.Error(w, "Erreur YouTube", 500)
 		return
 	}
 	defer resp.Body.Close()
 
-	// 5. Renvoyer le résultat JSON exact au JavaScript
+	// 5. Réponse
 	w.Header().Set("Content-Type", "application/json")
 	body, _ := ioutil.ReadAll(resp.Body)
 	w.Write(body)
 }
 
-// Point d'entrée de l'application : initialise les données, configure les routes et lance le serveur
 func main() {
 	chargerDonnees()
 
-	// Gestion fichiers statiques
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
-	// Routes
 	http.HandleFunc("/", routeAccueil)
 	http.HandleFunc("/api/index", routeApiIndex)
 	http.HandleFunc("/api/detail", routeApiDetail)
@@ -203,18 +199,17 @@ func main() {
 	http.HandleFunc("/api/youtube", routeApiYouTube)
 	http.HandleFunc("/api/recherche", routeApiRecherche)
 
-	// [NOUVEAU] Route sécurisée pour YouTube
+	// Route Proxy
 	http.HandleFunc("/api/yt-proxy", routeApiProxyYouTube)
 
-	// 1. GESTION INTELLIGENTE DU PORT
+	// Démarrage
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8081" // On force le 8081 pour le portfolio
-		fmt.Println("Mode Local : Démarrage Groupie Tracker sur http://localhost:8081")
+		port = "8081"
+		fmt.Println("Mode Local : http://localhost:8081")
 	} else {
-		fmt.Println("Mode Serveur : Démarrage sur le port :" + port)
+		fmt.Println("Mode Serveur : Port " + port)
 	}
 
-	// 2. LANCEMENT DU SERVEUR
 	http.ListenAndServe(":"+port, nil)
 }

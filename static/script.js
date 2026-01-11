@@ -1,4 +1,3 @@
-const API_KEY = "AIzaSyAHoo2BDboQafXAVfvOSfYuMmVitNhepU4"; // clé privée sécurisée google cloud 
 let player;
 let timer;
 let searchTimeout;
@@ -8,25 +7,25 @@ function safe(str) { return (str === undefined || str === null) ? "Inconnu" : St
 
 // Initialisation au chargement de la fenêtre
 window.onload = () => {
-    if(!sessionStorage.getItem('clean_v17')) {
+    if (!sessionStorage.getItem('clean_v17')) {
         sessionStorage.removeItem('myLib');
         sessionStorage.setItem('clean_v17', 'true');
     }
-    if(document.getElementById('lib-target')) loadLibrary();
-    
+    if (document.getElementById('lib-target')) loadLibrary();
+
     const sInput = document.getElementById('search-input');
-    if(sInput) {
+    if (sInput) {
         sInput.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 const val = e.target.value;
-                if(val.length > 1) navigate('/api/recherche?q='+val);
-                else if(val.length === 0) navigate('/api/index');
+                if (val.length > 1) navigate('/api/recherche?q=' + val);
+                else if (val.length === 0) navigate('/api/index');
             }, 300);
         });
     }
     // Initialiser YouTube Music si l'onglet est actif au chargement
-    if(document.getElementById('yt-search-input')) initYouTubeMusic();
+    if (document.getElementById('yt-search-input')) initYouTubeMusic();
 };
 
 // Gestionnaire global des clics pour la navigation SPA (Single Page Application)
@@ -35,7 +34,7 @@ document.addEventListener('click', e => {
     if (target) {
         e.preventDefault();
         const url = target.getAttribute('data-link');
-        if(target.classList.contains('nav-btn')) {
+        if (target.classList.contains('nav-btn')) {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             target.classList.add('active');
         }
@@ -47,52 +46,55 @@ document.addEventListener('click', e => {
 async function navigate(url) {
     try {
         const res = await fetch(url);
-        if(!res.ok) throw new Error("HTTP " + res.status);
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const html = await res.text();
         const contentDiv = document.getElementById('content');
-        if(contentDiv) contentDiv.innerHTML = html;
+        if (contentDiv) contentDiv.innerHTML = html;
         window.history.pushState({}, "", url.replace('/api', ''));
-        
+
         const tracker = document.getElementById('audio-tracker');
-        if(tracker) {
+        if (tracker) {
             const artist = tracker.getAttribute('data-artist');
-            if(artist) fetchTracks(artist);
+            if (artist) fetchTracks(artist);
         }
-        if(document.getElementById('lib-target')) loadLibrary();
+        if (document.getElementById('lib-target')) loadLibrary();
         // Initialiser YouTube Music si présent dans le contenu chargé
-        if(document.getElementById('yt-search-input')) initYouTubeMusic();
+        if (document.getElementById('yt-search-input')) initYouTubeMusic();
     } catch (err) {
         notify("ERREUR NAV: " + err);
     }
 }
 
-// Récupère les pistes audio depuis l'API YouTube pour un artiste donné
+// Récupère les pistes audio via le PROXY sécurisé (Go)
 async function fetchTracks(artist) {
     const list = document.getElementById('audio-tracker');
-    if(!list || !artist) return;
+    if (!list || !artist) return;
     const storageKey = "cache_" + safe(artist);
-    if(sessionStorage.getItem(storageKey)) {
-        try { renderList(JSON.parse(sessionStorage.getItem(storageKey)), artist); return; } 
-        catch(e) { sessionStorage.removeItem(storageKey); }
+    if (sessionStorage.getItem(storageKey)) {
+        try { renderList(JSON.parse(sessionStorage.getItem(storageKey)), artist); return; }
+        catch (e) { sessionStorage.removeItem(storageKey); }
     }
     const q = `${safe(artist)} official audio song`;
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&order=viewCount&maxResults=6&key=${API_KEY}`;
+
+    // Appel à NOTRE serveur au lieu de Google directement
+    const url = `/api/yt-proxy?q=${encodeURIComponent(q)}&maxResults=6`;
+
     try {
         const res = await fetch(url);
         const data = await res.json();
-        if(data.items) {
+        if (data.items) {
             const tracks = data.items.map(i => ({
                 id: i.id.videoId,
                 title: safe(i.snippet.title).replace(/Official|Video|Audio|[\[\]\(\)]/gi, "").trim()
             }));
             sessionStorage.setItem(storageKey, JSON.stringify(tracks));
             renderList(tracks, artist);
-        } else { 
+        } else {
             console.error("YouTube API Error:", data);
             const msg = data.error ? data.error.message : "API LIMITE (No items found)";
-            list.innerHTML = `<div style='padding:10px; color:red'>${msg}</div>`; 
+            list.innerHTML = `<div style='padding:10px; color:red'>${msg}</div>`;
         }
-    } catch(e) { list.innerHTML = "<div style='padding:10px; color:red'>ERREUR RESEAU.</div>"; }
+    } catch (e) { list.innerHTML = "<div style='padding:10px; color:red'>ERREUR RESEAU.</div>"; }
 }
 
 // Affiche la liste des pistes audio dans le DOM
@@ -100,10 +102,10 @@ function renderList(tracks, artist) {
     const list = document.getElementById('audio-tracker');
     let html = "";
     tracks.forEach((t, i) => {
-        const safeData = encodeURIComponent(JSON.stringify({id: t.id, title: t.title, artist: artist}));
+        const safeData = encodeURIComponent(JSON.stringify({ id: t.id, title: t.title, artist: artist }));
         const jsTitle = safe(t.title).replace(/'/g, "\\'");
         html += `<div class="track-row">
-            <div style="width:70%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;"><span style="color:#555">${i+1}.</span> ${safe(t.title)}</div>
+            <div style="width:70%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;"><span style="color:#555">${i + 1}.</span> ${safe(t.title)}</div>
             <div>
                 <button class="btn-icon" onclick="addToLib('${safeData}')">+</button>
                 <button class="btn-icon" onclick="playID('${t.id}', '${jsTitle}')">></button>
@@ -128,23 +130,23 @@ function onYouTubeIframeAPIReady() {
 // Gestionnaire d'événements pour les changements d'état du lecteur YouTube
 function onState(e) {
     const btn = document.getElementById('main-play');
-    if(e.data == 1) { btn.innerText = "||"; startTimer(); } else { btn.innerText = ">"; stopTimer(); }
+    if (e.data == 1) { btn.innerText = "||"; startTimer(); } else { btn.innerText = ">"; stopTimer(); }
 }
 
 // Lance la lecture d'une vidéo par son ID
 function playID(id, title) {
     document.getElementById('status').innerText = "LECTURE: " + safe(title);
-    if(player && player.loadVideoById) { player.loadVideoById(id); const vol = document.getElementById('vol'); if(vol) player.setVolume(vol.value); }
+    if (player && player.loadVideoById) { player.loadVideoById(id); const vol = document.getElementById('vol'); if (vol) player.setVolume(vol.value); }
 }
 
 // Bascule entre lecture et pause
-function togglePlay() { if(player) { if(player.getPlayerState() == 1) player.pauseVideo(); else player.playVideo(); } }
+function togglePlay() { if (player) { if (player.getPlayerState() == 1) player.pauseVideo(); else player.playVideo(); } }
 // Règle le volume du lecteur
-function setVolume(v) { if(player) player.setVolume(v); }
+function setVolume(v) { if (player) player.setVolume(v); }
 
 // Gère le déplacement dans la barre de progression
 function seek(e) {
-    if(!player || !player.getDuration) return;
+    if (!player || !player.getDuration) return;
     const container = document.getElementById('progress-container');
     const rect = container.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
@@ -153,7 +155,7 @@ function seek(e) {
 }
 
 // Démarre le timer pour mettre à jour la barre de progression
-function startTimer() { stopTimer(); timer = setInterval(() => { if(player && player.getCurrentTime) { const pct = (player.getCurrentTime() / player.getDuration()) * 100; const bar = document.getElementById('progress-fill'); if(bar) bar.style.width = pct + "%"; } }, 200); }
+function startTimer() { stopTimer(); timer = setInterval(() => { if (player && player.getCurrentTime) { const pct = (player.getCurrentTime() / player.getDuration()) * 100; const bar = document.getElementById('progress-fill'); if (bar) bar.style.width = pct + "%"; } }, 200); }
 // Arrête le timer de progression
 function stopTimer() { clearInterval(timer); }
 
@@ -162,20 +164,20 @@ function addToLib(encodedJson) {
     try {
         const data = JSON.parse(decodeURIComponent(encodedJson));
         let lib = JSON.parse(sessionStorage.getItem('myLib') || "[]");
-        if(lib.some(i => i.id === data.id)) { notify("DEJA EN BIBLIO."); return; }
+        if (lib.some(i => i.id === data.id)) { notify("DEJA EN BIBLIO."); return; }
         lib.push(data);
         sessionStorage.setItem('myLib', JSON.stringify(lib));
         notify("AJOUTE: " + safe(data.title));
-    } catch(e) { notify("ERREUR AJOUT"); }
+    } catch (e) { notify("ERREUR AJOUT"); }
 }
 
 // Charge et affiche la bibliothèque depuis le stockage local
 function loadLibrary() {
     const target = document.getElementById('lib-target');
-    if(!target) return;
+    if (!target) return;
     let lib = [];
-    try { lib = JSON.parse(sessionStorage.getItem('myLib') || "[]"); } catch(e) { sessionStorage.setItem('myLib', "[]"); }
-    if(lib.length === 0) { target.innerHTML = "<div style='padding:20px; color:#555'>VIDE.</div>"; return; }
+    try { lib = JSON.parse(sessionStorage.getItem('myLib') || "[]"); } catch (e) { sessionStorage.setItem('myLib', "[]"); }
+    if (lib.length === 0) { target.innerHTML = "<div style='padding:20px; color:#555'>VIDE.</div>"; return; }
     let html = "";
     lib.forEach((t, idx) => {
         const titre = safe(t.title);
@@ -203,7 +205,7 @@ function delFromLib(idx) {
 // Affiche une notification temporaire (toast)
 function notify(msg) {
     const box = document.getElementById('toast-container');
-    if(!box) return;
+    if (!box) return;
     const div = document.createElement('div');
     div.className = 'toast-msg'; div.innerText = "> " + msg;
     box.appendChild(div);
@@ -217,13 +219,13 @@ function notify(msg) {
 function initYouTubeMusic() {
     const input = document.getElementById('yt-search-input');
     const results = document.getElementById('yt-results');
-    if(!input || !results) return;
+    if (!input || !results) return;
     // Debounced search
     input.addEventListener('input', (e) => {
         clearTimeout(searchTimeout);
         const val = e.target.value.trim();
         searchTimeout = setTimeout(() => {
-            if(val.length > 1) ytSearch(val);
+            if (val.length > 1) ytSearch(val);
             else {
                 results.innerHTML = "<div style='padding:10px; color:#555; grid-column: 1 / -1;'>Entrez une requête ci-dessus.</div>";
             }
@@ -234,36 +236,40 @@ function initYouTubeMusic() {
     ytSearch('top music official audio');
 }
 
+// Fonction de recherche via le PROXY
 async function ytSearch(query) {
     const box = document.getElementById('yt-results');
-    if(!box) return;
+    if (!box) return;
     box.innerHTML = "<div style='padding:10px; color:var(--green); animation:blink 1s infinite;'>> RECHERCHE...</div>";
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&order=viewCount&key=${API_KEY}`;
+
+    // Appel à NOTRE serveur
+    const url = `/api/yt-proxy?q=${encodeURIComponent(query)}&maxResults=12`;
+
     try {
         const res = await fetch(url);
         const data = await res.json();
-        if(!data.items) {
+        if (!data.items) {
             const msg = data.error ? data.error.message : 'Aucun résultat.';
             box.innerHTML = `<div style='padding:10px; color:red'>${msg}</div>`;
             return;
         }
         renderYTResults(data.items);
-    } catch(e) {
+    } catch (e) {
         box.innerHTML = "<div style='padding:10px; color:red'>ERREUR RESEAU.</div>";
     }
 }
 
 function renderYTResults(items) {
     const box = document.getElementById('yt-results');
-    if(!box) return;
+    if (!box) return;
     let html = '';
     items.forEach(i => {
         const vid = i.id && i.id.videoId ? i.id.videoId : null;
-        if(!vid) return;
+        if (!vid) return;
         const title = safe(i.snippet && i.snippet.title);
         const channel = safe(i.snippet && i.snippet.channelTitle);
         const thumb = i.snippet && i.snippet.thumbnails && (i.snippet.thumbnails.medium?.url || i.snippet.thumbnails.default?.url) || '';
-        const dataObj = encodeURIComponent(JSON.stringify({id: vid, title: title, artist: channel}));
+        const dataObj = encodeURIComponent(JSON.stringify({ id: vid, title: title, artist: channel }));
         const jsTitle = title.replace(/'/g, "\\'");
         html += `
         <div class="card">

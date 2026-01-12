@@ -2,10 +2,10 @@ let player;
 let timer;
 let searchTimeout;
 
-// Utilitaire de sécurité texte
+// Utilitaire de sécurité pour éviter les valeurs null/undefined
 function safe(str) { return (str === undefined || str === null) ? "Inconnu" : String(str); }
 
-// Initialisation
+// -- INITIALISATION AU CHARGEMENT DE LA PAGE --
 window.onload = () => {
     if (!sessionStorage.getItem('clean_v17')) {
         sessionStorage.removeItem('myLib');
@@ -27,7 +27,8 @@ window.onload = () => {
     if (document.getElementById('yt-search-input')) initYouTubeMusic();
 };
 
-// Navigation SPA
+// GESTION DE LA NAVIGATION (SPA)
+// Intercepte les clics pour naviguer sans recharger la page
 document.addEventListener('click', e => {
     const target = e.target.closest('[data-link]');
     if (target) {
@@ -41,6 +42,7 @@ document.addEventListener('click', e => {
     }
 });
 
+// Fonction principale pour charger une nouvelle page via AJAX
 async function navigate(url) {
     try {
         const res = await fetch(url);
@@ -62,7 +64,8 @@ async function navigate(url) {
     }
 }
 
-// [MODIFIE] Appel au Proxy Go
+// RECUPERATION DES PISTES AUDIO
+// Appelle le proxy Go pour obtenir les musiques depuis YouTube
 async function fetchTracks(artist) {
     const list = document.getElementById('audio-tracker');
     if (!list || !artist) return;
@@ -115,6 +118,8 @@ const tag = document.createElement('script');
 tag.src = "https://www.youtube.com/iframe_api";
 document.body.appendChild(tag);
 
+// API YOUTUBE & LECTEUR
+// Initialise le lecteur YouTube invisible
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('yt-hidden', {
         height: '0', width: '0', playerVars: { playsinline: 1 },
@@ -122,16 +127,19 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
+// Gère le changement d'état (Lecture / Pause)
 function onState(e) {
     const btn = document.getElementById('main-play');
     if (e.data == 1) { btn.innerText = "||"; startTimer(); } else { btn.innerText = ">"; stopTimer(); }
 }
 
+// Lance la lecture d'une vidéo spécifique
 function playID(id, title) {
     document.getElementById('status').innerText = "LECTURE: " + safe(title);
     if (player && player.loadVideoById) { player.loadVideoById(id); const vol = document.getElementById('vol'); if (vol) player.setVolume(vol.value); }
 }
 
+// Bouton Play/Pause global
 function togglePlay() { if (player) { if (player.getPlayerState() == 1) player.pauseVideo(); else player.playVideo(); } }
 function setVolume(v) { if (player) player.setVolume(v); }
 
@@ -147,6 +155,8 @@ function seek(e) {
 function startTimer() { stopTimer(); timer = setInterval(() => { if (player && player.getCurrentTime) { const pct = (player.getCurrentTime() / player.getDuration()) * 100; const bar = document.getElementById('progress-fill'); if (bar) bar.style.width = pct + "%"; } }, 200); }
 function stopTimer() { clearInterval(timer); }
 
+// GESTION DE LA BIBLIOTHEQUE
+// Ajoute une piste aux favoris (SessionStorage)
 function addToLib(encodedJson) {
     try {
         const data = JSON.parse(decodeURIComponent(encodedJson));
@@ -158,6 +168,7 @@ function addToLib(encodedJson) {
     } catch (e) { notify("ERREUR AJOUT"); }
 }
 
+// Affiche la liste des favoris
 function loadLibrary() {
     const target = document.getElementById('lib-target');
     if (!target) return;
@@ -196,10 +207,9 @@ function notify(msg) {
     setTimeout(() => div.remove(), 3000);
 }
 
-// -----------------
-// YOUTUBE MUSIC TAB
-// -----------------
+// ONGLET YOUTUBE MUSIC
 
+// Initialise la barre de recherche de l'onglet Musique
 function initYouTubeMusic() {
     const input = document.getElementById('yt-search-input');
     const results = document.getElementById('yt-results');
@@ -220,7 +230,7 @@ function initYouTubeMusic() {
     ytSearch('top music official audio');
 }
 
-// [MODIFIE] Appel au Proxy Go
+// Recherche YouTube via le proxy (évite d'exposer la clé API)
 async function ytSearch(query) {
     const box = document.getElementById('yt-results');
     if (!box) return;

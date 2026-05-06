@@ -1,5 +1,5 @@
 # --- ÉTAPE 1 : Compilation (L'Atelier) ---
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # On installe les outils de build de base
 RUN apk add --no-cache git

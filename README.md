@@ -43,15 +43,6 @@ External API → Go Backend (fetch + combine + filter) → JSON → JavaScript (
 | `GET /api/artist/:id` | Single artist with concerts |
 | `GET /yt/search?q=term` | YouTube proxy (optional) |
 
----
-
-## Example Server Logs (Proof)
-
-```
-2025/11/25 11:02:25 Serving on http://localhost:8080
-2025/11/25 11:02:28 GET /api/combined 265ms     ← Go combines artists+shows
-2025/11/25 11:02:30 GET /api/artist/1 2.7ms     ← Go serves single artist
-2025/11/25 11:03:21 GET /api/combined 2.2ms     ← Served from cache
 ```
 
 **Flow:** Browser JS → Go endpoint → Go processes data → Returns JSON → JS renders
@@ -84,8 +75,4 @@ css/styles.css       # Styling
 ✅ **Unit tests** - `handlers_test.go` included  
 ✅ **Good practices** - Caching, concurrency, logging
 
-## Author
-
-**Léo Dupuy** (@leo-dpy)  
-Email: leo.dupuy@ynov.com
 

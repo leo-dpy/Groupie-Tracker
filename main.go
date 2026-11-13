@@ -149,10 +149,10 @@ func routeApiRecherche(w http.ResponseWriter, r *http.Request) {
 // [SECURITE] Proxy YouTube propre (Authentification via IP Serveur)
 func routeApiProxyYouTube(w http.ResponseWriter, r *http.Request) {
 	// 1. Récupération de la clé (Variable Coolify)
-	apiKey := os.Getenv("Clé_API_youtube_data")
+	apiKey := os.Getenv("YOUTUBE_API_KEY")
 
 	if apiKey == "" {
-		fmt.Println("ATTENTION: Variable 'Clé_API_youtube_data' vide.")
+		fmt.Println("ATTENTION: Variable 'YOUTUBE_API_KEY' vide.")
 		http.Error(w, "Erreur configuration serveur", 500)
 		return
 	}

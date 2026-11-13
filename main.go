@@ -52,7 +52,7 @@ func chargerDonnees() {
 
 	go func() {
 		defer wg.Done()
-		resp, err := http.Get("https://groupietrackers.herokuapp.com/api/artists")
+		resp, err := http.Get("https://groupietrackers.01edu.ai/api/artists")
 		if err == nil {
 			defer resp.Body.Close()
 			body, _ := ioutil.ReadAll(resp.Body)
@@ -69,7 +69,7 @@ func chargerDonnees() {
 
 	go func() {
 		defer wg.Done()
-		resp, err := http.Get("https://groupietrackers.herokuapp.com/api/relation")
+		resp, err := http.Get("https://groupietrackers.01edu.ai/api/relation")
 		if err == nil {
 			defer resp.Body.Close()
 			body, _ := ioutil.ReadAll(resp.Body)
